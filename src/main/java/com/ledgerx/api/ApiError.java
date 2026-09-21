@@ -1,4 +1,4 @@
-package com.ledgerx.transfer.api;
+package com.ledgerx.api;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -8,8 +8,8 @@ import java.util.List;
 public record ApiError(
     @Schema(format = "date-time", example = "2030-01-02T03:04:05Z") Instant timestamp,
     @Schema(example = "422") int status,
-    @Schema(example = "TRANSFER_NOT_PROCESSABLE") String code,
+    @Schema(example = "PAYMENT_NOT_PROCESSABLE") String code,
     @Schema(example = "wallet account has insufficient funds") String message,
-    @Schema(example = "/api/v1/transfers") String path,
+    @Schema(example = "/api/v1/payments") String path,
     @Schema(description = "Field-level validation details. Empty for business errors.")
         List<ApiFieldError> details) {}

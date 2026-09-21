@@ -1,5 +1,6 @@
 package com.ledgerx.transfer.api;
 
+import com.ledgerx.api.MoneyRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;

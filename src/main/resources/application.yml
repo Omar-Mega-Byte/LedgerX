@@ -13,6 +13,16 @@ spring:
     properties:
       hibernate:
         default_schema: ledgerx
+  kafka:
+    bootstrap-servers: ${LEDGERX_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: ledgerx-payment-event-audit-v1
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
 
 management:
   endpoints:
@@ -37,3 +47,16 @@ springdoc:
     doc-expansion: list
     default-models-expand-depth: 1
     default-model-expand-depth: 2
+
+ledgerx:
+  kafka:
+    payment-events-topic: ${LEDGERX_KAFKA_PAYMENT_EVENTS_TOPIC:ledgerx.payment-events.v1}
+    consumer-enabled: ${LEDGERX_KAFKA_CONSUMER_ENABLED:false}
+  outbox:
+    publisher-enabled: ${LEDGERX_OUTBOX_PUBLISHER_ENABLED:false}
+    poll-delay: ${LEDGERX_OUTBOX_POLL_DELAY:PT5S}
+    lease-duration: ${LEDGERX_OUTBOX_LEASE_DURATION:PT30S}
+    publish-timeout: ${LEDGERX_OUTBOX_PUBLISH_TIMEOUT:PT10S}
+    batch-size: ${LEDGERX_OUTBOX_BATCH_SIZE:20}
+    retry-base-delay: ${LEDGERX_OUTBOX_RETRY_BASE_DELAY:PT1S}
+    retry-max-delay: ${LEDGERX_OUTBOX_RETRY_MAX_DELAY:PT5M}

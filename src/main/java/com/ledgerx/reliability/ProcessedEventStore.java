@@ -1,7 +1,7 @@
 package com.ledgerx.reliability;
 
 import java.sql.Timestamp;
-import java.time.Instant;
+import java.time.Clock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,9 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProcessedEventStore {
 
   private final JdbcTemplate jdbcTemplate;
+  private final Clock clock;
 
-  public ProcessedEventStore(JdbcTemplate jdbcTemplate) {
+  public ProcessedEventStore(JdbcTemplate jdbcTemplate, Clock clock) {
     this.jdbcTemplate = jdbcTemplate;
+    this.clock = clock;
   }
 
   @Transactional
@@ -33,7 +35,7 @@ public class ProcessedEventStore {
             envelope.eventType(),
             envelope.aggregateId(),
             payloadHash,
-            Timestamp.from(Instant.now()));
+            Timestamp.from(clock.instant()));
     if (inserted == 1) {
       return true;
     }

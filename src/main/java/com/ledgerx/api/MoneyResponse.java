@@ -1,4 +1,4 @@
-package com.ledgerx.transfer.api;
+package com.ledgerx.api;
 
 import com.ledgerx.money.CurrencyCode;
 import com.ledgerx.money.Money;
