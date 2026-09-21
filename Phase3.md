@@ -1,6 +1,6 @@
 # Phase 3 — Reliable Merchant Payments, Refunds, and Event Delivery
 
-**Status: planned after an implementation audit on 2026-09-21.**
+**Status: implemented and verified on 2026-09-21.**
 
 ## 1. Goal
 
@@ -25,12 +25,7 @@ The implementation audit found Phase 1 and Phase 2 complete:
 | Completed, idempotent wallet transfers | Supplies the command/replay pattern, error shape, OpenAPI convention, and temporary caller-owner seam. |
 | PostgreSQL/Testcontainers integration and MockMvc tests | Supplies the test approach for schema, financial, API, and concurrency behaviour. |
 
-No `payment`, `refund`, `outbox`, or Kafka implementation exists yet: there are no corresponding packages, Flyway migrations, Maven dependencies, Compose services, or tests. That makes this a clean next vertical slice rather than an unfinished repair.
-
-### Documentation discrepancies
-
-- `docs/ROADMAP.md` correctly identifies Phase 3 as payment reliability, but its Phase 1/2 backlog entries are not marked complete.
-- `README.md` and `docs/architecture.md` still describe the repository as pre-domain. They conflict with the audited code and Phase 1/2 documents. They should be corrected during a scoped documentation update after Phase 3 implementation. They are not changed by this planning-only document; local edits to `README.md`, `TASKS.md`, and the foundation integration test remain outside this work.
+Phase 3 adds the `payment` and `reliability` modules, V6/V7 Flyway migrations, Kafka dependencies and Compose service, REST/OpenAPI endpoints, and focused unit/integration tests. The original planning decisions below are now the implemented contract.
 
 ## 3. Scope
 
@@ -377,4 +372,8 @@ LedgerX will have an auditable merchant payment/refund workflow whose synchronou
 
 ---
 
-This document is design only. No Phase 3 Java code, migrations, dependencies, configuration, infrastructure, or tests were implemented in this planning session.
+## Implementation and verification record
+
+Phase 3 is implemented as the documented modular-monolith vertical slice. Payment and refund facts, their balanced ledger journals, idempotency completions, and one immutable outbox event are committed atomically. The publisher provides leased, ordered, at-least-once Kafka delivery; the audit consumer provides durable duplicate-event safety without making financial writes.
+
+The completed verification suite covers payment/refund creation and replay, financial atomicity and rollback, partial/full/refund-limit state derivation, authorization/privacy, concurrent refunds, record immutability, OpenAPI generation, Kafka publication, and duplicate consumer delivery. On 2026-09-21, `mvnw.cmd clean verify` passed **17 unit tests** and **31 PostgreSQL/Kafka Testcontainers integration tests** with zero failures, errors, or skips.
