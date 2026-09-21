@@ -28,6 +28,9 @@ desktop.ini
 
 # Logs and temporary files
 *.log
+*.pid
+hs_err_pid*
+replay_pid*
 logs/
 tmp/
 temp/
@@ -44,6 +47,14 @@ temp/
 *.p12
 *.pfx
 secrets/
+
+# Local Docker Compose overrides
+compose.override.yml
+compose.override.yaml
+docker-compose.override.yml
+docker-compose.override.yaml
+docker-compose.local.yml
+docker-compose.local.yaml
 
 # Local tooling metadata
 .serena/
