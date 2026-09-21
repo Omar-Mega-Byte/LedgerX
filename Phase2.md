@@ -1,6 +1,6 @@
 # Phase 2 — Idempotent Wallet Transfers API
 
-**Status: design approved for later implementation.**
+**Status: design confirmed for later implementation.**
 
 ## 1. Goal
 
@@ -30,6 +30,7 @@ The Phase 0 foundation says authentication precedes exposing transfers, while th
 ### Included
 
 - Synchronous wallet-to-wallet USD transfers between two existing active wallets.
+- PERSON and MERCHANT owners may both send and receive: PERSON-to-PERSON, PERSON-to-MERCHANT, MERCHANT-to-PERSON, and MERCHANT-to-MERCHANT are equally valid.
 - A completed-transfer business record linked one-to-one to its immutable ledger transaction.
 - POST transfer creation and GET transfer lookup REST endpoints.
 - PostgreSQL-backed idempotency, request fingerprinting, replay, and conflict behavior.
@@ -44,6 +45,8 @@ The Phase 0 foundation says authentication precedes exposing transfers, while th
 - Payments, deposits, withdrawals, merchant settlement, fees, scheduled transfers, reversals, refunds, and chargebacks.
 - Multi-currency, FX, credit limits, holds, and available-versus-ledger balance separation.
 - Outbox events, Kafka, notifications, webhooks, Redis, rate limiting, reconciliation, and advanced observability.
+
+Funding remains internal to development setup, WalletAccountService, and test fixtures. Phase 2 does not add a public deposit, funding, or wallet-onboarding endpoint.
 
 The roadmap mentions transfer domain events in Phase 2. They are deliberately deferred with the outbox to Phase 3: emitting an unreliable in-process event after a financial commit would teach the wrong reliability model.
 
@@ -191,6 +194,7 @@ Financial ownership is already stored on each wallet account as owner_id. Phase 
 - POST permits a transfer only if that owner owns the source wallet.
 - GET permits a result only if that owner owns either participating wallet.
 - Destination ownership is not an authorization requirement for receipt.
+- Unrelated owners receive 404 rather than confirmation that a transfer exists.
 
 This header is a development seam, not authentication or authorization. Anyone can forge it, so this API is not safe to deploy publicly. A later security adapter will obtain the same owner UUID from SecurityContext and remove trust in the client header; TransferApplicationService should accept an OwnerContext/owner UUID rather than depend on HTTP directly.
 
