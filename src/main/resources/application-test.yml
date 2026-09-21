@@ -1,0 +1,10 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  main:
+    banner-mode: "off"
+
+logging:
+  level:
+    root: WARN
