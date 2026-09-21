@@ -1,0 +1,22 @@
+# Normalize text files and preserve LF in the repository.
+* text=auto eol=lf
+
+# Windows launchers must retain CRLF for cmd.exe.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Treat common binary assets as binary.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.jar binary
+*.war binary
+*.zip binary
+*.gz binary
+
+# Improve GitHub language classification for generated and configuration files.
+*.java linguist-language=Java
+pom.xml linguist-language=XML
