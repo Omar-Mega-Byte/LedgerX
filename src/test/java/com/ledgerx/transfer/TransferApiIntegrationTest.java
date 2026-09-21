@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ledgerx.access.OwnerContext;
 import com.ledgerx.ledger.application.LedgerBalanceQueryService;
 import com.ledgerx.ledger.application.LedgerPostingService;
 import com.ledgerx.ledger.domain.AccountType;
@@ -21,7 +22,6 @@ import com.ledgerx.money.CurrencyCode;
 import com.ledgerx.money.Money;
 import com.ledgerx.transfer.application.TransferApplicationService;
 import com.ledgerx.transfer.application.TransferExecution;
-import com.ledgerx.transfer.domain.OwnerContext;
 import com.ledgerx.transfer.domain.TransferCommand;
 import com.ledgerx.wallet.application.WalletAccountService;
 import com.ledgerx.wallet.application.WalletRegistration;
