@@ -172,6 +172,12 @@ TransferRequest uses dedicated DTOs and Bean Validation. Money parsing delegates
 
 No wallet-balance endpoint is included: without real authentication it would widen an intentionally temporary trust boundary, while transfer responses and tests already demonstrate balance correctness.
 
+### Interactive API documentation
+
+Springdoc publishes the complete public `/api/v1` transfer contract at `/api-docs` and an interactive Swagger UI at `/swagger`. The UI enables Try it out, request-duration display, filtering, sorted operations, and editable examples for both owner/idempotency headers and USD wallet-transfer bodies. It documents all success and stable error responses, including replay and idempotency-conflict behavior.
+
+The examples are intentionally illustrative: successful execution still requires active USD wallets and source funding through the internal development setup; no public setup or deposit endpoint is introduced for documentation convenience. Swagger UI and OpenAPI are disabled in the `prod` profile while `X-LedgerX-Owner-Id` remains a forgeable development seam.
+
 ## 12. Error Model
 
 The API returns one stable problem shape:
