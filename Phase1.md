@@ -1,5 +1,7 @@
 # Phase 1 — Ledger and Wallet Core
 
+**Status: implemented and verified on 2026-09-21.**
+
 ## 1. Goal
 
 Build the financial core that later money-movement features can trust: precise money, owned wallets, immutable journal history, balanced double-entry postings, and balances derived from that history.
@@ -8,7 +10,7 @@ This is a portfolio system, not a bank. The design deliberately demonstrates pro
 
 ## 2. Current Starting Point
 
-Phase 0 provides a Java 21 Spring Boot modular-monolith baseline with PostgreSQL, Flyway, JPA validation, local/test/prod profiles, Docker Compose, and PostgreSQL Testcontainers integration tests. The repository has no domain packages or financial schema yet; V1 only establishes infrastructure metadata.
+Phase 0 provides a Java 21 Spring Boot modular-monolith baseline with PostgreSQL, Flyway, JPA validation, local/test/prod profiles, Docker Compose, and PostgreSQL Testcontainers integration tests. Phase 1 adds USD money types, wallet owners, ledger accounts, immutable journal entities, V2/V3 Flyway migrations, transactional posting services, and PostgreSQL-backed invariant tests. V1 remains infrastructure metadata.
 
 The project uses package-by-feature, thin future HTTP boundaries, constructor injection, UTC-oriented time types, Flyway migrations, and Maven verify (including Failsafe integration tests). JPA entities must not become API contracts.
 
@@ -168,7 +170,7 @@ The default PostgreSQL READ COMMITTED isolation with explicit account-row locks 
 
 ## 13. Database Design
 
-Phase 1 will add only versioned Flyway migrations after V1.
+Phase 1 adds V2 for wallet ownership/accounts and V3 for immutable journal history and database triggers.
 
 | Table | Purpose and important columns | Integrity and indexes |
 |---|---|---|
@@ -188,7 +190,7 @@ Column checks, foreign keys, unique constraints, and triggers complement rather 
 
 ## 14. Java/Spring Component Design
 
-Use package-by-feature. The intended structure is:
+Use package-by-feature. The implemented structure is:
 
 | Area | Probable components | Responsibility |
 |---|---|---|
@@ -231,15 +233,15 @@ Integration tests must flush/commit where needed so deferred constraints are act
 
 ## 17. Implementation Sequence
 
-| Milestone | Goal and implementation | Dependencies and evidence |
+| Milestone | Delivered implementation | Verification evidence |
 |---|---|---|
-| 1.1 | Add Money/CurrencyCode and financial exceptions; define exact monetary validation. | No dependencies. Unit tests prove precision, equality, and invalid amounts. |
-| 1.2 | Add owner/account domain model and V2 migration for owner and ledger-account tables. | 1.1. PostgreSQL tests prove ownership, wallet shape, lifecycle, and uniqueness constraints. |
-| 1.3 | Add journal header/entry model, posting factory, V3 migration, and database immutability/balance triggers. | 1.1–1.2. Unit and integration tests prove balanced, immutable, currency-consistent history. |
-| 1.4 | Add transactional posting and derived-balance application services with ordered locks. | 1.2–1.3. Integration tests prove rollback, no negative wallet balance, and correct balance derivation. |
-| 1.5 | Add repeatable concurrent-posting test and document final schema/locking decisions in project docs as needed. | 1.4. Maven verify passes and the concurrent test proves the invariant. |
+| 1.1 | Added Money/CurrencyCode and financial validation. | Unit tests prove precision, equality, and invalid amounts. |
+| 1.2 | Added owner/account model and V2 ownership/account schema. | PostgreSQL tests prove ownership, wallet shape, lifecycle, and uniqueness constraints. |
+| 1.3 | Added immutable journal model/factory and V3 journal schema, balance trigger, and immutability triggers. | Unit and integration tests prove balanced, immutable, currency-consistent history. |
+| 1.4 | Added transactional posting and derived-balance services with ordered locks. | Integration tests prove rollback, no negative wallet balance, and correct balance derivation. |
+| 1.5 | Added repeatable concurrent-debit and database-integrity tests. | Maven verify passes with unit and PostgreSQL Testcontainers coverage. |
 
-Each milestone is a separate, focused commit where practical. No transfer controller or idempotency work enters these commits.
+Each milestone is represented by focused commits. No transfer controller or idempotency work entered the implementation.
 
 ## 18. Definition of Done
 
