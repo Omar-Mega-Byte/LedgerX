@@ -16,8 +16,8 @@ The initial profiles are intentionally minimal:
 | Profile | Purpose |
 |---|---|
 | `local` | Default developer workstation configuration |
-| `test` | Reserved for automated-test overrides when they are needed |
-| `prod` | Reserved for deployment-specific configuration; it must be activated explicitly |
+| `test` | Testcontainers-backed automated-test configuration |
+| `prod` | Deployment-specific configuration; it must be activated explicitly and has no database credential defaults |
 
 ## Environment variables and secrets
 

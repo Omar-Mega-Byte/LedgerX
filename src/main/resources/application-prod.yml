@@ -2,6 +2,10 @@ spring:
   config:
     activate:
       on-profile: prod
+  datasource:
+    url: ${LEDGERX_DB_URL}
+    username: ${LEDGERX_DB_USERNAME}
+    password: ${LEDGERX_DB_PASSWORD}
 
 server:
   shutdown: graceful
