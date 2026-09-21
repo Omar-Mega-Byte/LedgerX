@@ -2,6 +2,10 @@ spring:
   config:
     activate:
       on-profile: local
+  datasource:
+    url: ${LEDGERX_DB_URL:jdbc:postgresql://localhost:5432/ledgerx}
+    username: ${LEDGERX_DB_USERNAME:ledgerx}
+    password: ${LEDGERX_DB_PASSWORD:ledgerx_local_password}
 
 logging:
   level:

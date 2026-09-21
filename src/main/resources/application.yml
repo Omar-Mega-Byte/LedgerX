@@ -3,6 +3,16 @@ spring:
     name: ledgerx
   profiles:
     default: local
+  flyway:
+    default-schema: ledgerx
+    schemas: ledgerx
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: ledgerx
 
 management:
   endpoints:
