@@ -15,9 +15,11 @@
 
 | ID | Priority | Outcome | Acceptance signals |
 |---|---|---|---|
-| FND-01 | P0 | Bootstrap a Spring Boot/Maven application with a health endpoint | Maven Wrapper runs `verify`; context-load and health tests pass |
+| FND-01 | P0 | **Complete** — bootstrap a Spring Boot/Maven application with a health endpoint | Maven Wrapper runs `verify`; context-load test passes; `/actuator/health` returns `UP` |
 | FND-02 | P0 | Add local PostgreSQL and versioned Flyway migrations | Local database starts predictably; migration history is recorded |
-| FND-03 | P0 | Establish test layers and Java quality checks | Unit and PostgreSQL Testcontainers tests run; Java version and formatting are verified |
+| FND-03 | P0 | **Complete** — enforce Java 21 and formatting checks | `verify` rejects unsupported Java versions and fails on unformatted Java sources |
+| TST-01 | P0 | Establish database integration-test layers | PostgreSQL Testcontainers tests run for persistence and transactional behavior |
+| CFG-01 | P0 | **Complete** — establish local/test/prod profile and secret conventions | `local` is the default; tracked configuration has no secrets; `.env.example` documents safe variables |
 | LGR-01 | P0 | Model monetary values, currencies, ledger accounts, transactions, and entries | No floating-point money; a posted transaction balances per currency |
 | WAL-01 | P0 | Add wallet/account ownership and a safe balance strategy | Authority of ledger versus any derived balance is documented and tested |
 | XFR-01 | P0 | Deliver an idempotent wallet-to-wallet transfer | Duplicate same-key requests have one effect; insufficient funds and concurrent debits preserve invariants |

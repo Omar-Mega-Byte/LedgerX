@@ -6,10 +6,10 @@
 
 **Goal:** make the project easy to understand, clone, and develop safely.
 
-- Repository hygiene, README, architecture notes, backlog, and roadmap
-- Spring Boot/Maven bootstrap and health endpoint
-- Java quality baseline, local configuration conventions, and secret handling
-- Docker Compose PostgreSQL, Flyway, test layers, container build, and CI
+- **Complete:** repository hygiene, README, architecture notes, backlog, and roadmap
+- **Complete:** Spring Boot/Maven bootstrap, context-load test, and health endpoint
+- **Complete:** Java 21 quality baseline, local/test/prod configuration conventions, and secret handling
+- Remaining: Docker Compose PostgreSQL, Flyway, database test layers, container build, and CI
 
 **Exit criteria:** a clean checkout can run documented verification and local infrastructure without tracking credentials or generated artifacts.
 
