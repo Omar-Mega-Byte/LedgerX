@@ -23,3 +23,17 @@ management:
     health:
       probes:
         enabled: true
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger
+    try-it-out-enabled: true
+    display-request-duration: true
+    filter: true
+    operations-sorter: alpha
+    tags-sorter: alpha
+    doc-expansion: list
+    default-models-expand-depth: 1
+    default-model-expand-depth: 2
