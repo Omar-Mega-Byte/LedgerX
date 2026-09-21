@@ -58,6 +58,10 @@ docker-compose.local.yaml
 
 # Local tooling metadata
 .serena/
+.codex/
+
+# Generated Graphify knowledge graph
+graphify-out/
 
 # Development guide
 TASKS.md
