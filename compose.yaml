@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:17.11-alpine3.24
+    environment:
+      POSTGRES_DB: ${LEDGERX_DB_NAME:-ledgerx}
+      POSTGRES_USER: ${LEDGERX_DB_USERNAME:-ledgerx}
+      POSTGRES_PASSWORD: ${LEDGERX_DB_PASSWORD:-ledgerx_local_password}
+    ports:
+      - "${LEDGERX_DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      LEDGERX_DB_URL: jdbc:postgresql://postgres:5432/${LEDGERX_DB_NAME:-ledgerx}
+      LEDGERX_DB_USERNAME: ${LEDGERX_DB_USERNAME:-ledgerx}
+      LEDGERX_DB_PASSWORD: ${LEDGERX_DB_PASSWORD:-ledgerx_local_password}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  postgres-data:
