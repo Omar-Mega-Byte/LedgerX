@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-The application bootstrap is still pending. The target local toolchain is Java 21 (or a later compatible LTS release), Git, and Docker Desktop for integration dependencies. Maven will be invoked through the Maven Wrapper once it is added.
+Install a Java 21 JDK and Git. Docker Desktop will be needed once integration dependencies are introduced. Maven is invoked through the checked-in Maven Wrapper, so a global Maven installation is not required.
 
 ## Repository hygiene
 
@@ -33,7 +33,7 @@ Each meaningful change should include verification appropriate to its risk:
 | Concurrent money movement | Repeatable concurrent test proving invariant preservation |
 | Documentation/configuration | Review rendered Markdown and confirm no secrets are tracked |
 
-Once the Maven Wrapper exists, the standard local verification command will be:
+The standard local verification command is:
 
 ```powershell
 .\mvnw.cmd verify
