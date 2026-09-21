@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible defect in LedgerX.
+title: "bug: "
+labels: ["type: bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not include credentials, tokens, connection strings, or other secrets.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, Java version, Docker state, and relevant profile where applicable.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or evidence
+      description: Redact all sensitive data before pasting logs.
