@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a product or engineering improvement.
+title: "feat: "
+labels: ["type: feature", "needs triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What outcome or failure mode does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the smallest useful behavior, not a solution-only request.
+    validations:
+      required: true
+  - type: textarea
+    id: financial-correctness
+    attributes:
+      label: Financial correctness and reliability considerations
+      description: Note effects on money, idempotency, transactions, concurrency, security, or auditability. State "Not applicable" when none apply.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance signals
+      description: What observable behavior, tests, or documentation would show this is complete?
+    validations:
+      required: true
