@@ -10,7 +10,8 @@
 - **Complete:** Spring Boot/Maven bootstrap, context-load test, and health endpoint
 - **Complete:** Java 21 quality baseline, local/test/prod configuration conventions, and secret handling
 - **Complete:** Docker Compose PostgreSQL, Flyway V1 migration, Testcontainers database test, and container build
-- **Configured:** GitHub Actions verification workflow; its first remote run remains pending until the repository is pushed
+- **Complete:** GitHub Actions verification workflow runs `verify` on pushes and pull requests; `main` requires its green `Verify` check before a pull request can merge
+- **Complete:** issue triage labels and structured bug/feature issue forms
 
 **Exit criteria:** a clean checkout can run documented verification and local infrastructure without tracking credentials or generated artifacts.
 
