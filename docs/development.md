@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-Install a Java 21 JDK and Git. Docker Desktop will be needed once integration dependencies are introduced. Maven is invoked through the checked-in Maven Wrapper, so a global Maven installation is not required.
+Install a Java 21 JDK, Git, and Docker Desktop. Docker is required for the PostgreSQL Testcontainers integration tests. Maven is invoked through the checked-in Maven Wrapper, so a global Maven installation is not required.
 
 ## Repository hygiene
 
@@ -28,7 +28,7 @@ Each meaningful change should include verification appropriate to its risk:
 | Change | Expected verification |
 |---|---|
 | Domain rule | Focused unit tests, including invalid and boundary cases |
-| Persistence or transaction behavior | PostgreSQL-backed integration test, preferably Testcontainers |
+| Persistence or transaction behavior | PostgreSQL-backed `*IntegrationTest`, run by Maven Failsafe with Testcontainers |
 | API behavior | Controller/application test for status, validation, and authorization |
 | Concurrent money movement | Repeatable concurrent test proving invariant preservation |
 | Documentation/configuration | Review rendered Markdown and confirm no secrets are tracked |
@@ -38,6 +38,8 @@ The standard local verification command is:
 ```powershell
 .\mvnw.cmd verify
 ```
+
+Use `*Test` for fast unit tests and `*IntegrationTest` for Docker-backed integration tests. The latter run during Maven's `verify` phase, not its unit-test phase.
 
 ## Commit guidance
 
