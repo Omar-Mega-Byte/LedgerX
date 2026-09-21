@@ -29,7 +29,8 @@
 | PAY-01 | P1 | Add a payment state machine and merchant-scoped idempotency | Valid transitions are explicit; invalid transitions are rejected |
 | RFD-01 | P1 | Support full and partial refunds with compensating ledger entries | Refund total cannot exceed the captured amount |
 | WHK-01 | P1 | Deliver signed webhooks with retry tracking | Signatures, retry schedule, failures, and manual replay are auditable |
-| OPS-01 | P1 | **Configured** — containerize local dependencies/application and add CI verification | Docker-based startup passes locally; GitHub Actions runs `verify` after the first remote push |
+| OPS-01 | P1 | **Complete** — containerize local dependencies/application and add CI verification | Docker-based startup passes locally; GitHub Actions runs `verify` on pushes and pull requests; `main` requires its green check for pull requests |
+| COL-01 | P1 | **Complete** — establish contribution triage metadata | Type, priority, area, and triage labels exist; structured bug and feature issue forms are available |
 | RSK-01 | P2 | Implement a configurable rule-based risk decision | ALLOW, REVIEW, and BLOCK outcomes are traceable and tested |
 | REC-01 | P2 | Add a reconciliation job | Ledger, derived balance, and payment-state mismatches are reported |
 | OBS-01 | P2 | Add actionable metrics and tracing | Payment, outbox, webhook, and reconciliation metrics are exposed |
