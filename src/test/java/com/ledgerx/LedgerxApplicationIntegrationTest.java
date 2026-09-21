@@ -2,9 +2,15 @@ package com.ledgerx;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -14,7 +20,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @Testcontainers
 class LedgerxApplicationIntegrationTest {
@@ -28,6 +34,8 @@ class LedgerxApplicationIntegrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
+  @Autowired private TestRestTemplate restTemplate;
+
   @DynamicPropertySource
   static void configureDataSource(DynamicPropertyRegistry registry) {
     registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -37,6 +45,16 @@ class LedgerxApplicationIntegrationTest {
 
   @Test
   void contextLoads() {}
+
+  @Test
+  void exposesHealthEndpoint() {
+    ResponseEntity<Map<String, Object>> response =
+        restTemplate.exchange(
+            "/actuator/health", HttpMethod.GET, null, new ParameterizedTypeReference<>() {});
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).containsEntry("status", "UP");
+  }
 
   @Test
   void flywayAppliesInitialInfrastructureMigration() {

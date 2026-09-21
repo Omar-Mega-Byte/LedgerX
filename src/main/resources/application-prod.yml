@@ -13,3 +13,15 @@ server:
 logging:
   level:
     root: INFO
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+ledgerx:
+  kafka:
+    consumer-enabled: ${LEDGERX_KAFKA_CONSUMER_ENABLED:true}
+  outbox:
+    publisher-enabled: ${LEDGERX_OUTBOX_PUBLISHER_ENABLED:true}
