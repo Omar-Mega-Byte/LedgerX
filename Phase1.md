@@ -217,6 +217,21 @@ Full domain/persistence duplication would add mapping ceremony before the model 
 
 Integration tests must flush/commit where needed so deferred constraints are actually evaluated. Tests assert financial outcomes and failure modes, not implementation details or coverage totals. Existing health and V1 migration verification remain intact.
 
+### Completed and tested Phase 1 features
+
+Phase 1 is complete. Its tested capabilities are:
+
+- **Exact USD money:** canonical two-decimal `BigDecimal` values; rounding-required and negative amounts are rejected, while zero remains valid for derived balances.
+- **Balanced journal construction:** valid debit/credit candidates are immutable; unbalanced, duplicate-account, and zero-amount postings are rejected before persistence.
+- **Owned USD wallets:** a PERSON or MERCHANT owner receives at most one USD wallet; wallet and system-account shapes follow the ledger-account constraints.
+- **Derived balances and internal funding:** balances are calculated from immutable entry history rather than a mutable balance field.
+- **Financial lifecycle controls:** suspended and closed wallets reject new postings; closing requires a zero derived balance.
+- **Database-enforced integrity:** PostgreSQL rejects unbalanced journal headers at commit, prevents history and account-identity mutation, and preserves currency/foreign-key constraints.
+- **Atomic failure behavior:** a rejected posting leaves no partial journal fact committed.
+- **Concurrent debit safety:** competing debits from one funded wallet are serialized with ordered pessimistic locks; only affordable work commits and the resulting balance remains non-negative.
+
+The Phase 1 completion verification ran 18 tests with zero failures or errors: 7 fast unit tests plus 11 PostgreSQL/Testcontainers and application integration tests. Later phases add their own coverage without weakening these core invariants.
+
 ## 16. Risks and Mitigations
 
 | Risk | Mitigation |
