@@ -19,7 +19,11 @@ out/
 .project
 .classpath
 .settings/
+.factorypath
+.metadata/
+*.launch
 .vscode/
+.vs/
 
 # Operating system files
 .DS_Store
@@ -31,6 +35,9 @@ desktop.ini
 *.pid
 hs_err_pid*
 replay_pid*
+java_pid*.hprof
+*.hprof
+*.jfr
 logs/
 tmp/
 temp/
@@ -42,6 +49,7 @@ temp/
 .env
 .env.*
 !.env.example
+.envrc
 *.pem
 *.key
 *.p12
@@ -62,6 +70,3 @@ docker-compose.local.yaml
 
 # Generated Graphify knowledge graph
 graphify-out/
-
-# Development guide
-TASKS.md
