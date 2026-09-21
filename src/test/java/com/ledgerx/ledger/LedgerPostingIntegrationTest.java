@@ -69,8 +69,8 @@ class LedgerPostingIntegrationTest {
   @BeforeEach
   void clearFinancialData() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.ledger_entries, ledgerx.ledger_transactions, "
-            + "ledgerx.ledger_accounts, ledgerx.wallet_owners");
+        "TRUNCATE TABLE ledgerx.transfer_idempotency, ledgerx.transfers, ledgerx.ledger_entries, "
+            + "ledgerx.ledger_transactions, ledgerx.ledger_accounts, ledgerx.wallet_owners");
   }
 
   @Test
