@@ -24,13 +24,13 @@ The primary design goals are:
 - Redis and Apache Kafka where they solve concrete reliability or performance needs
 - Docker Compose for local dependencies
 - JUnit 5, Mockito, Spring Boot Test, and Testcontainers
-- GitHub Actions for verification
+- GitHub Actions for verification; pull requests to `main` require the green `Verify` check
 
 These choices are directional, not commitments. See [the architecture notes](docs/architecture.md) for the intended shape and [the development guide](docs/development.md) for conventions.
 
 ## Planned first vertical slice
 
-The first meaningful slice will establish a wallet/account model and a double-entry transfer flow. It should demonstrate explicit money types, balanced entries, atomic persistence, insufficient-funds handling, and idempotent requests before broader payment features are added.
+The first meaningful slice is an idempotent wallet-to-wallet transfer backed by an immutable double-entry ledger. It will demonstrate explicit money types, balanced entries, atomic persistence, insufficient-funds handling, and idempotent requests before broader payment features are added. The [foundation record](docs/FOUNDATION.md) explains the implementation order and guardrails.
 
 ## Repository layout
 
@@ -69,6 +69,7 @@ For current direction and delivery sequencing, read:
 - [Delivery roadmap](docs/ROADMAP.md)
 - [Configuration conventions](docs/configuration.md)
 - [Docker instructions](docs/docker.md)
+- [Development foundation record](docs/FOUNDATION.md)
 - [Living project context](PROJECT_CONTEXT.txt)
 - [Task list](TASKS.md)
 
