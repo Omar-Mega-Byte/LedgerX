@@ -25,7 +25,7 @@ That keeps Phase 1 focused while ensuring Phase 2 does not need to redesign fina
 
 ### Included
 
-- EGP money and currency value objects with no floating-point arithmetic.
+- USD money and currency value objects with no floating-point arithmetic.
 - Stable financial owner records, without credentials or authentication.
 - Ledger accounts that represent wallets and future system accounts.
 - Immutable journal transactions and balanced debit/credit entries.
@@ -46,7 +46,7 @@ That keeps Phase 1 focused while ensuring Phase 2 does not need to redesign fina
 | Decision | Choice | Why |
 |---|---|---|
 | Deployment shape | Modular monolith | One PostgreSQL transaction is the correct consistency boundary for the core. |
-| Supported currency | EGP only, represented explicitly everywhere | It avoids premature FX and varying minor-unit rules while preventing a hidden “currency-less amount” design. |
+| Supported currency | USD only, represented explicitly everywhere | It avoids premature FX and varying minor-unit rules while preventing a hidden “currency-less amount” design. |
 | Amount storage | BigDecimal and PostgreSQL NUMERIC(19,2) | Exact decimal arithmetic is understandable and safe for the initial two-decimal currency. |
 | Wallet/account relationship | A wallet is an owned LIABILITY ledger account of kind WALLET; no duplicate wallets table | There are no wallet-only fields yet, so a second table would duplicate identity, owner, currency, status, and balance semantics. |
 | Ledger representation | One immutable journal header with two or more positive debit/credit lines | It supports ordinary two-party movements and later fee splits without special cases. |
@@ -58,7 +58,7 @@ That keeps Phase 1 focused while ensuring Phase 2 does not need to redesign fina
 
 Money is a value: an amount plus a currency. It is not a floating-point number and has no sign used to express movement direction.
 
-- Introduce Money and CurrencyCode in com.ledgerx.money. CurrencyCode initially permits only EGP.
+- Introduce Money and CurrencyCode in com.ledgerx.money. CurrencyCode initially permits only USD.
 - Money canonicalizes its BigDecimal amount to scale 2 using RoundingMode.UNNECESSARY. An input such as 10.00 or 10 is representable; 10.001 is rejected rather than silently rounded.
 - Money permits zero for values such as a derived balance, but a ledger posting amount must be strictly positive. Debit or credit expresses direction; negative posting amounts are invalid.
 - Persist a posting amount as NUMERIC(19,2), giving up to 17 whole-number digits. Every monetary column has an amount > 0 check where zero is not meaningful.
@@ -73,7 +73,7 @@ A wallet is the customer-facing meaning of one LedgerAccount with:
 - account kind WALLET;
 - accounting type LIABILITY;
 - a non-null WalletOwner;
-- one immutable EGP currency; and
+- one immutable USD currency; and
 - an ACTIVE, SUSPENDED, or CLOSED account state.
 
 The identity of the wallet is the ledger-account UUID. Its balance is the normal balance of that liability account, not a mutable wallet.balance field. A credit increases what the platform owes the owner; a debit decreases it. This terminology can initially feel backwards for “money in/out,” which is exactly why debit/credit must be defined by account type rather than by everyday language.
@@ -98,7 +98,7 @@ The ledger has three concepts:
 
 Account types are ASSET, LIABILITY, REVENUE, EXPENSE, and EQUITY. Their normal side is derived in code, not stored: ASSET and EXPENSE are debit-normal; LIABILITY, REVENUE, and EQUITY are credit-normal. This preserves conventional accounting semantics and lets the same table represent future internal accounts.
 
-Phase 1 stores one currency per LedgerTransaction. Each entry repeats that currency only so composite foreign keys can prove it matches both its transaction and account. A future FX business operation would use balanced postings per currency and explicit rate/clearing accounts; it must not treat an exchange rate as an arithmetic shortcut inside one EGP transaction.
+Phase 1 stores one currency per LedgerTransaction. Each entry repeats that currency only so composite foreign keys can prove it matches both its transaction and account. A future FX business operation would use balanced postings per currency and explicit rate/clearing accounts; it must not treat an exchange rate as an arithmetic shortcut inside one USD transaction.
 
 ## 8. Double-Entry Accounting Model
 
@@ -135,9 +135,9 @@ Wallet balances may not become negative. System accounts have no Phase 1 product
 | Rule | Why | Enforcement |
 |---|---|---|
 | Every posting has at least two distinct account entries and total debits equal total credits. | Value cannot appear or disappear. | Domain factory/service, deferred PostgreSQL constraint trigger, integration tests. |
-| Each entry amount is positive, precise to two decimals, and EGP. | A side, not a negative sign, represents direction; precision is consistent. | Money value object, column checks, integration/unit tests. |
+| Each entry amount is positive, precise to two decimals, and USD. | A side, not a negative sign, represents direction; precision is consistent. | Money value object, column checks, integration/unit tests. |
 | Entry, account, and transaction currency match. | A balance cannot hide a currency mismatch. | Composite foreign keys, application validation, tests. |
-| A wallet is one active/suspended/closed EGP liability account owned by one active owner. | Ownership and accounting responsibility remain explicit. | Foreign keys, account-kind/type checks, unique owner/currency index, application rules, tests. |
+| A wallet is one active/suspended/closed USD liability account owned by one active owner. | Ownership and accounting responsibility remain explicit. | Foreign keys, account-kind/type checks, unique owner/currency index, application rules, tests. |
 | One owner has at most one wallet per currency. | Wallet selection is deterministic in the first product slice. | Partial unique index and tests. |
 | Owner, currency, kind, account type, journal header, and journal entries are immutable. | Historical financial facts must remain auditable. | Encapsulated domain API, database immutability triggers, restrictive foreign keys, integration tests. |
 | Suspended or closed accounts and inactive owners cannot participate in a new posting. | Lifecycle state must have financial effect. | Posting service inside the transaction, tests. |
@@ -173,7 +173,7 @@ Phase 1 will add only versioned Flyway migrations after V1.
 | Table | Purpose and important columns | Integrity and indexes |
 |---|---|---|
 | wallet_owners | id UUID PK, owner_type, status, created_at, updated_at. It is a financial identity, not an authentication user. | Checks for supported owner/status values; owner data is never cascaded away. |
-| ledger_accounts | id UUID PK, account_kind, account_type, owner_id nullable FK, system_code nullable, currency, status, created_at, closed_at. A WALLET row is the wallet. | WALLET requires LIABILITY + owner and no system code; SYSTEM requires system code and no owner. Unique system_code. Partial unique (owner_id, currency) for WALLET. Checks currency EGP and valid lifecycle values. Index owner_id for owner queries. |
+| ledger_accounts | id UUID PK, account_kind, account_type, owner_id nullable FK, system_code nullable, currency, status, created_at, closed_at. A WALLET row is the wallet. | WALLET requires LIABILITY + owner and no system code; SYSTEM requires system code and no owner. Unique system_code. Partial unique (owner_id, currency) for WALLET. Checks currency USD and valid lifecycle values. Index owner_id for owner queries. |
 | ledger_transactions | id UUID PK, currency, description, posted_at. This row is created only when the complete journal is posted. | Currency check; composite unique (id, currency) supports entry currency FK; posted fields are immutable. Index posted_at for history ordering. |
 | ledger_entries | id UUID PK, ledger_transaction_id, line_number, ledger_account_id, side, amount, currency. | amount > 0, line_number > 0, unique (transaction, line_number), unique (transaction, account). Composite FKs (transaction, currency) and (account, currency). Index (ledger_account_id, ledger_transaction_id) supports balance/history queries. |
 
@@ -219,7 +219,7 @@ Integration tests must flush/commit where needed so deferred constraints are act
 
 | Risk | Mitigation |
 |---|---|
-| Floating-point or silent rounding changes money. | Canonical BigDecimal scale, EGP-only policy, reject rounding, NUMERIC(19,2), focused tests. |
+| Floating-point or silent rounding changes money. | Canonical BigDecimal scale, USD-only policy, reject rounding, NUMERIC(19,2), focused tests. |
 | A mutable balance drifts from history. | Do not store one; query the immutable ledger. |
 | One-sided or mixed-currency entries persist. | Domain validation, composite FKs, deferred database balance trigger, integration tests. |
 | Debit/credit labels are implemented as universal plus/minus signs. | Derive normal side from account type and test wallet LIABILITY examples. |
@@ -245,8 +245,8 @@ Each milestone is a separate, focused commit where practical. No transfer contro
 
 Phase 1 is complete only when all of the following are true:
 
-- Money is EGP-aware, exact, scale-validated, and never represented by float/double.
-- Wallet ownership is represented without authentication coupling; one owner has at most one EGP wallet.
+- Money is USD-aware, exact, scale-validated, and never represented by float/double.
+- Wallet ownership is represented without authentication coupling; one owner has at most one USD wallet.
 - A wallet is an owned LIABILITY ledger account with a defined lifecycle and no mutable balance field.
 - Posted journals contain two or more positive entries, match account/transaction currency, and balance debit-to-credit at database commit.
 - Posted journals and entries cannot be updated or deleted; account identity fields cannot be changed.
