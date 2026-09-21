@@ -51,4 +51,3 @@ CREATE UNIQUE INDEX ledger_accounts_system_code_key
     WHERE account_kind = 'SYSTEM';
 
 CREATE INDEX ledger_accounts_owner_id_index ON ledger_accounts (owner_id);
-
