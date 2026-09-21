@@ -45,7 +45,7 @@ The first meaningful slice is an idempotent wallet-to-wallet transfer backed by 
 └── TASKS.md              # Sequenced setup and delivery tasks
 ```
 
-The Maven application structure will be added in the bootstrap task.
+The Maven application structure and Phase 0 development foundation are in place. Phases 1–3 add the ledger/wallet core, idempotent transfers, and reliable merchant payments/refunds.
 
 ## Getting started
 
