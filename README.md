@@ -51,6 +51,8 @@ For current direction and delivery sequencing, read:
 
 - [Architecture notes](docs/architecture.md)
 - [Development guide](docs/development.md)
+- [Delivery backlog](docs/BACKLOG.md)
+- [Delivery roadmap](docs/ROADMAP.md)
 - [Living project context](PROJECT_CONTEXT.txt)
 - [Task list](TASKS.md)
 
