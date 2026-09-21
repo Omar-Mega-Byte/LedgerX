@@ -1,7 +1,16 @@
 package com.ledgerx.transfer.api;
 
 import com.ledgerx.money.CurrencyCode;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public record MoneyRequest(@NotBlank String amount, @NotNull CurrencyCode currency) {}
+@Schema(description = "A USD monetary amount supplied by a transfer caller.")
+public record MoneyRequest(
+    @Schema(
+            description = "Positive decimal amount with at most two decimal places.",
+            example = "25.00")
+        @NotBlank
+        String amount,
+    @Schema(description = "LedgerX currently supports USD only.", example = "USD") @NotNull
+        CurrencyCode currency) {}
