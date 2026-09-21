@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,6 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -410,6 +412,35 @@ class TransferApiIntegrationTest {
                     "changed-key",
                     "immutable-key"))
         .isInstanceOf(DataAccessException.class);
+  }
+
+  @Test
+  void publishesInteractiveOpenApiDocumentationWithReadyToEditExamples() throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(get("/api-docs"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andReturn();
+
+    JsonNode document = body(result);
+    JsonNode createTransfer = document.at("/paths/~1api~1v1~1transfers/post");
+    assertThat(document.at("/info/title").asText()).isEqualTo("LedgerX API");
+    assertThat(createTransfer.at("/operationId").asText()).isEqualTo("createTransfer");
+    assertThat(createTransfer.at("/responses/201/description").asText())
+        .contains("completed atomically");
+    assertThat(
+            createTransfer
+                .at(
+                    "/requestBody/content/application~1json/examples/usd-wallet-transfer/value/money/amount")
+                .asText())
+        .isEqualTo("25.00");
+    assertThat(createTransfer.at("/parameters").toString())
+        .contains("X-LedgerX-Owner-Id", "Idempotency-Key", "transfer-demo-0001");
+    assertThat(document.at("/paths/~1api~1v1~1transfers~1{transferId}/get/operationId").asText())
+        .isEqualTo("getTransfer");
+
+    mockMvc.perform(get("/swagger")).andExpect(status().is3xxRedirection());
   }
 
   private org.springframework.test.web.servlet.ResultActions postTransfer(
