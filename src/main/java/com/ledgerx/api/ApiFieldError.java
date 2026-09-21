@@ -1,4 +1,4 @@
-package com.ledgerx.transfer.api;
+package com.ledgerx.api;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

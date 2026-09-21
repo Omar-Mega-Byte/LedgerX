@@ -1,6 +1,9 @@
 package com.ledgerx.transfer.api;
 
 import com.ledgerx.access.OwnerContext;
+import com.ledgerx.api.ApiError;
+import com.ledgerx.api.MalformedRequestException;
+import com.ledgerx.api.MoneyRequest;
 import com.ledgerx.money.Money;
 import com.ledgerx.transfer.application.TransferApplicationService;
 import com.ledgerx.transfer.application.TransferExecution;
@@ -311,7 +314,7 @@ public class TransferController {
     try {
       return new OwnerContext(UUID.fromString(ownerHeader));
     } catch (IllegalArgumentException exception) {
-      throw new MalformedTransferRequestException("owner header must be a UUID", exception);
+      throw new MalformedRequestException("owner header must be a UUID", exception);
     }
   }
 
@@ -319,8 +322,7 @@ public class TransferController {
     try {
       return new Money(new BigDecimal(request.amount()), request.currency());
     } catch (NumberFormatException exception) {
-      throw new MalformedTransferRequestException(
-          "money amount must be a decimal string", exception);
+      throw new MalformedRequestException("money amount must be a decimal string", exception);
     } catch (IllegalArgumentException exception) {
       throw new TransferValidationException(exception.getMessage());
     }

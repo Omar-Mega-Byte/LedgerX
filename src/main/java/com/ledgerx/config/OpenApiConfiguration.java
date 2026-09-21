@@ -18,15 +18,15 @@ public class OpenApiConfiguration {
                 .version("v1")
                 .description(
                     """
-                    Interactive documentation for LedgerX's public USD wallet transfer API.
+                    Interactive documentation for LedgerX's USD wallet transfers and merchant payments.
 
                     **Development-only ownership seam:** `X-LedgerX-Owner-Id` is forgeable and is
                     not authentication. Do not expose this API publicly until a real authenticated
                     principal replaces it.
 
-                    The examples are ready to edit and execute. Before a successful transfer, use
-                    the internal development setup to create active USD wallets and fund the source
-                    wallet; public onboarding and deposit APIs are intentionally out of scope.
+                    The examples are ready to edit and execute. Before a successful transfer or
+                    payment, use the internal development setup to create active USD wallets and fund
+                    the source wallet; public onboarding and deposit APIs are intentionally out of scope.
                     """))
         .addServersItem(new Server().url("/").description("Current LedgerX server"));
   }

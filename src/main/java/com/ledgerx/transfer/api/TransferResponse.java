@@ -1,5 +1,6 @@
 package com.ledgerx.transfer.api;
 
+import com.ledgerx.api.MoneyResponse;
 import com.ledgerx.transfer.domain.Transfer;
 import com.ledgerx.transfer.domain.TransferStatus;
 import io.swagger.v3.oas.annotations.media.Schema;

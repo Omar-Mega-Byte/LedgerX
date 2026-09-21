@@ -8,3 +8,9 @@ spring:
 logging:
   level:
     root: WARN
+
+ledgerx:
+  kafka:
+    consumer-enabled: false
+  outbox:
+    publisher-enabled: false

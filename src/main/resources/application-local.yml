@@ -10,3 +10,9 @@ spring:
 logging:
   level:
     com.ledgerx: INFO
+
+ledgerx:
+  kafka:
+    consumer-enabled: true
+  outbox:
+    publisher-enabled: true
