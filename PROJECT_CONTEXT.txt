@@ -1,0 +1,1237 @@
+LEDGERX — LIVING PROJECT CONTEXT
+================================
+
+Purpose
+-------
+LedgerX is a production-inspired Java/Spring backend portfolio project focused on financial correctness,
+payments, digital wallets, immutable ledger design, concurrency, idempotency, event-driven processing,
+reliable messaging, security, and auditability.
+
+This file exists so Codex or any other coding assistant working inside the LedgerX project folder understands:
+- the current product direction,
+- the intended engineering depth,
+- the important architectural concerns,
+- the expected technology stack,
+- the feature priorities,
+- and how future changes should be handled.
+
+IMPORTANT: NOTHING IN THIS FILE IS FINAL.
+-----------------------------------------
+This is a living technical context file, not a frozen specification.
+
+The developer expects to change:
+- service boundaries,
+- package structure,
+- APIs,
+- database schemas,
+- event names,
+- security design,
+- technologies,
+- business rules,
+- priorities,
+- and feature scope.
+
+Always prefer the newest explicit developer instruction over this document.
+
+If new requirements conflict with this file:
+1. Follow the new requirement.
+2. Adapt the architecture coherently.
+3. Update related code and tests.
+4. Add migrations when persistence changes.
+5. Update documentation when architecture materially changes.
+6. Do not preserve an outdated design just because it appears here.
+
+The goal is to build as much as possible in roughly one month, but quality and correctness matter more
+than completing every feature.
+
+
+======================================================================
+PROJECT IDENTITY
+======================================================================
+
+Name:
+LedgerX
+
+Working description:
+A distributed payment and digital wallet platform inspired by payment processors, digital wallets,
+banking ledgers, and financial transaction systems.
+
+Primary portfolio purpose:
+Demonstrate correctness-critical backend engineering.
+
+LedgerX should show that the developer can work with:
+- Spring Boot
+- Spring Security
+- REST APIs
+- PostgreSQL
+- Redis
+- Kafka
+- transactions
+- concurrency
+- double-entry accounting
+- idempotency
+- outbox pattern
+- retries
+- webhooks
+- reconciliation
+- risk rules
+- audit logs
+- Docker
+- automated testing
+- observability
+
+LedgerX should NOT become a generic e-commerce application.
+
+Its identity should remain centered around:
+- money movement,
+- transaction correctness,
+- ledger integrity,
+- duplicate prevention,
+- failure handling,
+- auditability,
+- and reliable payment workflows.
+
+
+======================================================================
+ENGINEERING PHILOSOPHY
+======================================================================
+
+Prefer:
+- correctness over feature count,
+- explicit business rules,
+- testable domain logic,
+- a smaller complete system over many unfinished services,
+- production-inspired patterns used for real reasons,
+- explainable design choices.
+
+Avoid:
+- adding technologies only to impress,
+- creating many microservices without meaningful boundaries,
+- placing business logic in controllers,
+- exposing JPA entities directly,
+- hiding financial logic behind generic CRUD,
+- relying only on application validation when database constraints can help,
+- pretending external integrations are real when they are mocked.
+
+Every difficult feature should ideally have:
+- a clear purpose,
+- tests,
+- README documentation,
+- failure-case handling,
+- and an explanation of the design tradeoff.
+
+
+======================================================================
+PREFERRED TECH STACK
+======================================================================
+
+Core:
+- Java 21+ or Java 25 if ecosystem compatibility is stable
+- Spring Boot
+- Spring Web
+- Spring Security
+- Spring Data JPA
+- Spring Validation
+- Spring Actuator
+- Spring Kafka
+- PostgreSQL
+- Flyway
+- Redis
+- Apache Kafka
+- Docker
+- Docker Compose
+- OpenAPI / Swagger
+
+Testing:
+- JUnit 5
+- Mockito
+- Spring Boot Test
+- Testcontainers
+
+Observability:
+- Micrometer
+- Prometheus
+- Grafana
+- OpenTelemetry when useful
+
+Resilience:
+- Resilience4j when meaningful
+
+CI/CD:
+- GitHub Actions
+
+Possible later additions:
+- Kubernetes
+- Helm
+- Debezium
+- Kafka Connect
+- schema registry
+- secret management
+- service discovery
+- centralized configuration
+
+Do not add optional technologies unless they solve a real problem.
+
+
+======================================================================
+POSSIBLE ARCHITECTURE
+======================================================================
+
+LedgerX may begin as:
+- a modular monolith,
+- or a small microservice architecture.
+
+Possible services/modules:
+- api-gateway
+- identity-service
+- payment-service
+- wallet-service
+- ledger-service
+- risk-service
+- webhook-service
+- notification-service
+- reconciliation-service
+
+Do NOT create all of them immediately.
+
+A practical early version may use:
+1. identity-service
+2. payment-service
+3. ledger-service
+4. webhook/notification module
+5. gateway if useful
+
+Wallet behavior may initially live inside payment or ledger logic.
+
+Service boundaries are expected to evolve.
+
+
+======================================================================
+CORE DOMAIN CONCEPTS
+======================================================================
+
+Possible concepts:
+- User
+- Merchant
+- Wallet
+- Currency
+- Payment
+- Transfer
+- Refund
+- LedgerAccount
+- LedgerTransaction
+- LedgerEntry
+- Fee
+- Payout
+- WebhookEndpoint
+- WebhookDelivery
+- IdempotencyRecord
+- RiskEvaluation
+- ReconciliationRun
+- AuditLog
+- ApiKey
+
+Not every concept must exist in the first version.
+
+
+======================================================================
+CORE FEATURE — DOUBLE-ENTRY LEDGER
+======================================================================
+
+The strongest feature of LedgerX should be an immutable or append-only double-entry ledger.
+
+Do not model important money movement only as:
+
+wallet.balance = wallet.balance - amount
+
+Instead, important financial movement should generate balanced ledger entries.
+
+Example:
+
+Transaction:
+TX-92818
+
+Entries:
+USER_WALLET        -500 EGP
+MERCHANT_WALLET    +490 EGP
+PLATFORM_FEES       +10 EGP
+
+Total:
+0 EGP
+
+Important rules:
+- Every posted ledger transaction must balance.
+- Entries should be append-only or immutable after posting.
+- Corrections should preferably use compensating entries.
+- Monetary values must never use float/double.
+- Currency must be explicit where relevant.
+- Financial history should be auditable.
+- Ledger integrity should be testable.
+
+Potential classes:
+- LedgerAccount
+- LedgerTransaction
+- LedgerEntry
+- Money
+- Currency
+
+Names can change.
+
+
+======================================================================
+BALANCE MODEL
+======================================================================
+
+Possible approaches:
+
+A. Calculate balance from ledger entries.
+B. Maintain a derived balance for performance.
+C. Use both, with the ledger as the ultimate source of truth.
+
+Do not freeze the design yet.
+
+If a cached/derived balance exists:
+- update it safely,
+- protect concurrent modifications,
+- reconcile it with the ledger,
+- and document which store is authoritative.
+
+
+======================================================================
+PAYMENTS
+======================================================================
+
+Potential payment states:
+- CREATED
+- AUTHORIZED
+- PROCESSING
+- COMPLETED
+- FAILED
+- CANCELLED
+- REFUND_PENDING
+- PARTIALLY_REFUNDED
+- REFUNDED
+
+Use explicit valid transitions.
+
+Example:
+CREATED -> AUTHORIZED
+AUTHORIZED -> PROCESSING
+PROCESSING -> COMPLETED
+PROCESSING -> FAILED
+COMPLETED -> REFUND_PENDING
+REFUND_PENDING -> REFUNDED
+
+Invalid transitions must be rejected.
+
+Avoid generic "setStatus()" behavior from controllers.
+
+
+======================================================================
+IDEMPOTENCY
+======================================================================
+
+High-priority feature.
+
+Example:
+POST /api/v1/payments
+
+Header:
+Idempotency-Key: <client-generated-key>
+
+Repeated requests with the same key must not create repeated financial effects.
+
+Need to consider:
+- same key + same payload
+- same key + different payload
+- concurrent requests using same key
+- expiration
+- merchant/user scope
+- response replay
+- transaction boundaries
+- request fingerprint/hash
+
+Potential storage:
+- PostgreSQL
+- Redis with durable backing
+- dedicated idempotency table
+
+The first implementation should prefer correctness and simplicity.
+
+
+======================================================================
+TRANSACTIONAL OUTBOX
+======================================================================
+
+High-value reliability feature.
+
+Problem:
+Database state and Kafka publication must not become inconsistent.
+
+Preferred concept:
+
+BEGIN
+  save business state
+  insert outbox event
+COMMIT
+
+Then:
+background publisher -> Kafka
+
+Possible outbox fields:
+- id
+- aggregate_type
+- aggregate_id
+- event_type
+- payload
+- created_at
+- published_at
+- status
+- retry_count
+
+Initial implementation may use polling.
+
+Possible later evolution:
+- Debezium CDC
+
+
+======================================================================
+DOMAIN EVENTS
+======================================================================
+
+Potential events:
+- PAYMENT_CREATED
+- PAYMENT_AUTHORIZED
+- PAYMENT_COMPLETED
+- PAYMENT_FAILED
+- PAYMENT_CANCELLED
+- REFUND_REQUESTED
+- REFUND_COMPLETED
+- REFUND_FAILED
+- TRANSFER_COMPLETED
+- WALLET_CREDITED
+- WALLET_DEBITED
+- RISK_REVIEW_REQUIRED
+- WEBHOOK_DELIVERY_REQUESTED
+
+Names are not final.
+
+Useful event metadata:
+- eventId
+- eventType
+- aggregateId
+- occurredAt
+- schemaVersion
+- business payload
+
+
+======================================================================
+IDEMPOTENT CONSUMERS
+======================================================================
+
+Kafka consumers must assume duplicate delivery can happen.
+
+Possible strategy:
+processed_events table
+
+Fields:
+- event_id
+- consumer_name
+- processed_at
+
+Goal:
+At-least-once transport with effectively-once business behavior where needed.
+
+A repeated PAYMENT_COMPLETED event must not:
+- duplicate notifications,
+- duplicate fees,
+- duplicate downstream business side effects.
+
+
+======================================================================
+CONCURRENCY
+======================================================================
+
+Important interview area.
+
+Potential races:
+- two transfers spend the same balance,
+- duplicate payment requests arrive together,
+- two refunds are requested simultaneously,
+- the same wallet is updated concurrently.
+
+Potential techniques:
+- optimistic locking with @Version
+- pessimistic locking
+- atomic SQL updates
+- database constraints
+- stronger transaction isolation
+- Redis locks only where truly justified
+
+Do not use distributed locks automatically.
+
+Choose based on the real race condition and document why.
+
+
+======================================================================
+TRANSFERS
+======================================================================
+
+Potential wallet-to-wallet transfer requirements:
+- authenticated owner
+- valid destination
+- sufficient balance
+- idempotency
+- atomicity
+- balanced ledger entries
+- audit record
+- transaction reference
+- event publication
+
+Possible states:
+- PENDING
+- COMPLETED
+- FAILED
+- REVERSED
+
+
+======================================================================
+REFUNDS
+======================================================================
+
+Potential features:
+- full refund
+- partial refund
+- multiple partial refunds
+- maximum refundable amount
+- refund idempotency
+- compensating ledger transaction
+- asynchronous workflow
+- refund events
+- merchant webhook
+
+Total refunds must never exceed the originally captured amount.
+
+
+======================================================================
+FEES
+======================================================================
+
+Possible fee model:
+
+Payment = 500 EGP
+Merchant receives = 490 EGP
+Platform fee = 10 EGP
+
+Fees should be reflected through ledger accounts.
+
+Fee rules may later become configurable.
+
+
+======================================================================
+WEBHOOK SYSTEM
+======================================================================
+
+Merchants may register endpoints for events such as:
+- payment.completed
+- payment.failed
+- refund.completed
+- transfer.completed
+
+Potential requirements:
+- HMAC signing
+- timestamp
+- event ID
+- retries
+- exponential backoff
+- delivery logs
+- HTTP status tracking
+- failure state
+- manual replay
+- secret rotation later
+
+Possible delivery states:
+- PENDING
+- DELIVERING
+- SUCCEEDED
+- FAILED
+- DEAD
+
+Never expose webhook secrets in logs.
+
+
+======================================================================
+RISK / FRAUD ENGINE
+======================================================================
+
+No machine learning is required.
+
+A rule-based system is enough.
+
+Possible signals:
+- payment velocity
+- abnormal amount
+- repeated failures
+- new device
+- suspicious IP
+- geography
+- account age
+- merchant-specific settings
+
+Possible result:
+- ALLOW
+- REVIEW
+- BLOCK
+
+Example scoring:
++30 too many recent attempts
++20 new device
++40 high amount
++50 risky location
+
+Thresholds are only examples and should remain configurable.
+
+
+======================================================================
+RECONCILIATION
+======================================================================
+
+Potential reconciliation checks:
+- ledger entries balance,
+- wallet derived balance matches ledger balance,
+- payment state aligns with ledger postings,
+- refund totals are correct,
+- external provider simulator data matches internal records.
+
+Possible result:
+- MATCHED
+- MISMATCHED
+- INVESTIGATION_REQUIRED
+
+Can begin as a scheduled internal job.
+
+
+======================================================================
+SECURITY
+======================================================================
+
+Possible authentication:
+- email/password
+- JWT access token
+- refresh token
+- OAuth2 later
+
+Potential roles:
+- USER
+- MERCHANT
+- ADMIN
+- SUPPORT
+- SYSTEM
+
+Possible permissions:
+- payment:create
+- payment:view-own
+- refund:create
+- wallet:view-own
+- merchant:webhook:manage
+- admin:risk:manage
+- admin:reconciliation:view
+
+Object-level authorization matters.
+
+Examples:
+- user cannot access another user's wallet,
+- merchant cannot inspect another merchant's data,
+- API key scopes must be enforced.
+
+
+======================================================================
+API KEYS
+======================================================================
+
+Possible merchant API key support.
+
+Requirements:
+- secret shown only once
+- store hash instead of raw secret where feasible
+- key identifier/prefix
+- scopes
+- expiration
+- revocation
+- last-used timestamp
+- rate limits
+
+
+======================================================================
+RATE LIMITING
+======================================================================
+
+Possible rate-limited operations:
+- login
+- payment creation
+- refund attempts
+- merchant API access
+- webhook management
+
+Redis can implement:
+- token bucket
+- sliding window
+
+
+======================================================================
+DATABASE IDEAS
+======================================================================
+
+Possible tables:
+
+users
+roles
+permissions
+user_roles
+
+merchants
+api_keys
+
+wallets
+ledger_accounts
+ledger_transactions
+ledger_entries
+
+payments
+payment_attempts
+transfers
+refunds
+fees
+
+idempotency_records
+
+outbox_events
+processed_events
+
+webhook_endpoints
+webhook_deliveries
+
+risk_rules
+risk_evaluations
+
+reconciliation_runs
+reconciliation_items
+
+audit_logs
+
+This is not a final schema.
+
+
+======================================================================
+DATABASE RULES
+======================================================================
+
+Use:
+- PostgreSQL
+- Flyway
+- constraints
+- indexes
+- proper transaction boundaries
+- pagination
+- explicit relationships
+- intentional fetch plans
+
+Avoid:
+- ddl-auto=create for production-like usage
+- exposing JPA entities
+- giant bidirectional graphs
+- CascadeType.ALL everywhere
+- EAGER everywhere
+- ignoring N+1 issues
+
+Important possible constraints:
+- unique idempotency key in correct scope
+- positive monetary amounts
+- valid references
+- unique API key identifiers
+- consistent payment/refund constraints
+
+
+======================================================================
+MONEY RULES
+======================================================================
+
+Use:
+- BigDecimal
+or
+- a Money value object
+
+Never use:
+- float
+- double
+
+for financial values.
+
+Define rounding explicitly.
+
+Currency should be explicit.
+
+
+======================================================================
+TIME RULES
+======================================================================
+
+Prefer:
+- Instant
+- OffsetDateTime
+
+Store internal timestamps in UTC where possible.
+
+
+======================================================================
+TESTING GOALS
+======================================================================
+
+High-priority tests:
+- ledger transactions balance
+- transfer atomicity
+- insufficient balance
+- concurrent debit attempts
+- duplicate idempotency key
+- same key with different payload
+- duplicate Kafka event
+- outbox transaction behavior
+- refund limit
+- partial refund behavior
+- invalid payment state transition
+- resource authorization
+- HMAC webhook signing
+- webhook retries
+- rate limiting
+- reconciliation mismatch detection
+
+Use Testcontainers for:
+- PostgreSQL
+- Redis
+- Kafka
+
+Important concurrency test:
+many simultaneous attempts to spend/reserve the same funds must not corrupt balances.
+
+
+======================================================================
+OBSERVABILITY
+======================================================================
+
+Possible metrics:
+- payment.created
+- payment.completed
+- payment.failed
+- payment.processing.duration
+- ledger.transaction.created
+- ledger.reconciliation.mismatch
+- refund.created
+- refund.failed
+- webhook.delivery.success
+- webhook.delivery.failure
+- webhook.delivery.duration
+- kafka.consumer.lag
+- http.server.requests
+
+Possible dashboards:
+- payment success rate
+- payment failure rate
+- latency
+- webhook failure rate
+- retry count
+- reconciliation mismatches
+
+
+======================================================================
+API DESIGN
+======================================================================
+
+Prefer versioned REST endpoints:
+
+/api/v1/...
+
+Possible examples:
+
+POST /api/v1/payments
+GET  /api/v1/payments/{id}
+POST /api/v1/payments/{id}/refunds
+
+POST /api/v1/transfers
+
+GET  /api/v1/wallets/{id}
+
+GET  /api/v1/ledger/transactions/{id}
+
+Examples are not final.
+
+Potential standard error response:
+
+{
+  "timestamp": "...",
+  "status": 400,
+  "code": "INVALID_REQUEST",
+  "message": "...",
+  "path": "/api/v1/...",
+  "traceId": "...",
+  "details": []
+}
+
+
+======================================================================
+CODE STYLE DIRECTION
+======================================================================
+
+Prefer:
+- constructor injection
+- DTOs
+- records where appropriate
+- small focused services
+- explicit transaction boundaries
+- global exception handling
+- meaningful domain names
+- typed configuration properties
+
+Possible package style:
+
+com.example.ledgerx
+  ├── payment
+  ├── ledger
+  ├── wallet
+  ├── webhook
+  ├── risk
+  ├── security
+  └── shared
+
+or a layered structure if it fits better.
+
+Do not freeze package design prematurely.
+
+
+======================================================================
+CONFIGURATION
+======================================================================
+
+Prefer externalized config.
+
+Example:
+
+ledgerx:
+  webhook:
+    max-attempts:
+    timeout:
+  risk:
+    thresholds:
+  idempotency:
+    ttl:
+
+Do not hard-code tunable business settings.
+
+
+======================================================================
+ERROR HANDLING
+======================================================================
+
+Possible domain exceptions:
+- ResourceNotFoundException
+- InvalidStateTransitionException
+- InsufficientFundsException
+- DuplicateRequestException
+- UnauthorizedOperationException
+
+Use stable application error codes.
+
+Do not expose stack traces or secrets to clients.
+
+
+======================================================================
+LOGGING
+======================================================================
+
+Useful context:
+- traceId
+- requestId
+- eventId
+- paymentId
+- transactionId
+- merchantId
+
+Do not log:
+- passwords
+- JWTs
+- refresh tokens
+- raw API secrets
+- private keys
+- sensitive payment credentials
+
+
+======================================================================
+RETRY / RESILIENCE
+======================================================================
+
+Retry only transient failures.
+
+Potential retryable:
+- network errors
+- 503 responses
+- webhook timeouts
+- temporary Kafka failures
+
+Potential non-retryable:
+- invalid state
+- unauthorized operation
+- invalid payload
+- insufficient funds
+
+Use:
+- max attempts
+- exponential backoff
+- dead-letter handling where relevant
+- metrics around retries
+
+Avoid infinite retries.
+
+
+======================================================================
+DOCKER / LOCAL DEVELOPMENT
+======================================================================
+
+Goal:
+A new developer should be able to run LedgerX locally with minimal setup.
+
+Possible Compose services:
+- PostgreSQL
+- Redis
+- Kafka
+- application services
+- Prometheus
+- Grafana
+
+Provide:
+- docker-compose.yml
+- .env.example
+- local application config
+- startup instructions
+
+Never commit real secrets.
+
+
+======================================================================
+CI/CD
+======================================================================
+
+Possible GitHub Actions flow:
+1. checkout
+2. setup Java
+3. compile
+4. unit tests
+5. integration tests
+6. static checks
+7. package
+8. Docker image build
+
+Possible later:
+- registry push
+- staging deployment
+- smoke tests
+
+
+======================================================================
+README EXPECTATIONS
+======================================================================
+
+README should eventually include:
+- overview
+- architecture
+- tech stack
+- key engineering challenges
+- domain model
+- setup
+- Docker instructions
+- environment variables
+- Swagger/OpenAPI
+- event flow
+- database model
+- transaction strategy
+- idempotency strategy
+- concurrency strategy
+- testing strategy
+- screenshots where useful
+- known limitations
+- future improvements
+- tradeoffs
+
+README should explain WHY, not just WHAT.
+
+
+======================================================================
+FEATURE PRIORITIES
+======================================================================
+
+CORE:
+- authentication
+- wallet/account concept
+- double-entry ledger
+- transfers or payments
+- idempotency
+- transaction safety
+- PostgreSQL
+- tests
+
+HIGH:
+- Kafka
+- transactional outbox
+- idempotent consumers
+- refunds
+- webhooks
+- Docker
+- Redis
+
+MEDIUM:
+- fees
+- risk engine
+- API keys
+- reconciliation
+- observability
+
+STRETCH:
+- payout workflow
+- multi-currency conversion
+- external payment-provider simulator
+- Kubernetes
+
+
+======================================================================
+POSSIBLE IMPLEMENTATION ORDER
+======================================================================
+
+Phase 1:
+- bootstrap
+- PostgreSQL
+- Flyway
+- authentication
+- users
+- wallets
+- ledger accounts
+- ledger transactions
+
+Phase 2:
+- transfers
+- balance checks
+- transaction safety
+- idempotency
+- concurrency protection
+
+Phase 3:
+- payments
+- payment state machine
+- Kafka
+- outbox
+- idempotent consumers
+
+Phase 4:
+- refunds
+- webhooks
+- Redis
+- rate limiting
+
+Phase 5:
+- risk engine
+- reconciliation
+- metrics
+- dashboards
+- CI/CD polish
+
+This order is only a guideline.
+
+
+======================================================================
+GOOD DEMO SCENARIO
+======================================================================
+
+1. Create user.
+2. Create merchant.
+3. Fund wallet through simulator.
+4. Create payment.
+5. Retry same request with same idempotency key.
+6. Prove no duplicate money movement occurred.
+7. Show ledger entries.
+8. Show balanced transaction.
+9. Trigger refund.
+10. Show compensating ledger entries.
+11. Show outbox event.
+12. Show Kafka delivery.
+13. Show webhook delivery.
+14. Force webhook failure and retry.
+15. Run reconciliation.
+16. Show concurrency/idempotency tests.
+
+
+======================================================================
+CV / INTERVIEW GOALS
+======================================================================
+
+LedgerX should eventually support accurate claims such as:
+
+- Designed a Spring Boot payment platform with a double-entry ledger for auditable financial transactions.
+- Implemented idempotent payment processing and concurrency controls to prevent duplicate money movement.
+- Used PostgreSQL transactions, Kafka, Redis, and the transactional outbox pattern for reliable event-driven workflows.
+- Built webhook delivery with HMAC signing, retries, and delivery tracking.
+- Added integration and concurrency testing with Testcontainers.
+
+Only claim features that are actually implemented.
+
+The developer should be able to explain:
+- why a ledger exists,
+- why idempotency matters,
+- how duplicate events are handled,
+- how concurrent spending is prevented,
+- what happens when Kafka is unavailable,
+- how refunds are modeled,
+- what the source of truth is,
+- and how the system is tested.
+
+
+======================================================================
+NON-GOALS FOR NOW
+======================================================================
+
+Do not prioritize unless explicitly requested:
+- real card storage
+- PCI certification
+- real bank settlement
+- full banking compliance
+- giant frontend
+- native mobile application
+- dozens of microservices
+- machine-learning fraud detection
+- global multi-region deployment
+- Kubernetes for its own sake
+
+
+======================================================================
+CODEX WORKING RULES
+======================================================================
+
+When working on LedgerX:
+
+1. Read this file.
+2. Read README and existing code.
+3. Verify what is already implemented.
+4. Do not recreate existing features.
+5. Prefer the newest developer instruction.
+6. Keep financial correctness explicit.
+7. Think about duplicate requests.
+8. Think about retries.
+9. Think about concurrent operations.
+10. Think about transaction boundaries.
+11. Think about authorization.
+12. Add or update tests.
+13. Add Flyway migrations when persistence changes.
+14. Keep secrets out of source control.
+15. Avoid over-engineering.
+16. Do not assume listed features are complete.
+17. Do not treat current architecture as final.
+18. Keep the project explainable in interviews.
+
+MOST IMPORTANT:
+LedgerX should demonstrate real financial backend engineering, not technology collection.
