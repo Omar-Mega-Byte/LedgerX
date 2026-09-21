@@ -2,18 +2,21 @@
 
 ## Current state
 
-LedgerX has not selected a final service topology or implemented a domain model. It will begin as a modular monolith unless a concrete boundary justifies extraction. This preserves simple transactions and deployment while keeping modules organized around the domain.
+LedgerX is a Java 21 modular monolith with PostgreSQL as its financial source of truth. It implements active PERSON/MERCHANT wallet ownership, exact USD money, immutable balanced ledger journals, idempotent wallet transfers, payer-authorized merchant payments, merchant-authorized refunds, and a transactional outbox. PostgreSQL constraints/triggers and focused Testcontainers tests protect financial facts and derived wallet balances.
 
-## Intended domain boundaries
+Kafka propagates committed payment/refund events asynchronously; it is never the authority for money. The outbox publisher uses short leased claims and retries, so a crash may duplicate delivery but cannot silently lose a committed event. Consumers deduplicate durable local effects by event ID.
 
-The initial modules are expected to be:
+## Domain boundaries
+
+The current modules are:
 
 | Area | Responsibility |
 |---|---|
-| Identity | Authentication, authorization, and merchant/user ownership |
-| Wallet and ledger | Accounts, balances, immutable ledger transactions, and entries |
-| Payments and transfers | Payment state transitions, transfers, fees, and refunds |
-| Reliability | Idempotency records, outbox events, and consumer deduplication |
+| Access and wallet | Development-only caller context plus active PERSON/MERCHANT wallet ownership |
+| Wallet and ledger | Accounts, derived balances, immutable ledger transactions, and entries |
+| Transfers | Idempotent USD wallet-to-wallet transfers |
+| Payments | PERSON-to-MERCHANT payments, compensating refunds, and derived refund state |
+| Reliability | Payment/refund idempotency records, outbox events, publisher leases, and consumer deduplication |
 | Webhooks | Signed event delivery, retries, and delivery audit history |
 
 These are organization boundaries, not separate deployables at this stage.
@@ -58,11 +61,11 @@ The database is the source of truth for committed financial state. Kafka is used
 
 The following need evidence from real use cases before being fixed:
 
-- calculated versus derived wallet balances;
-- optimistic locking, pessimistic locking, or atomic SQL updates for each race condition;
 - module/service extraction boundaries;
 - Redis usage and cache authority;
-- Kafka topology, retry policy, and schema versioning;
 - authentication mechanism and external identity integration.
+- payment-provider authorization, capture, fees, settlement, chargebacks, and FX;
+- webhook delivery/replay operations and reconciliation policy;
+- event retention and dead-letter operations policy.
 
 Architecture changes that alter these assumptions should update this document and include tests for the affected failure mode.

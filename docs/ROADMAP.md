@@ -19,36 +19,37 @@
 
 **Goal:** establish a trustworthy financial source of truth.
 
-- User/merchant ownership model and first authorization boundary
-- Money and currency value model
-- Ledger accounts, transactions, immutable entries, and balance invariants
-- Wallet/account model with documented balance authority
-- PostgreSQL-backed domain and concurrency tests
+- **Complete:** active PERSON/MERCHANT ownership model and development-only ownership seam
+- **Complete:** exact USD money value model
+- **Complete:** ledger accounts, immutable balanced journals/entries, and derived-balance invariants
+- **Complete:** wallet/account model with database integrity and ordered locking
+- **Complete:** PostgreSQL-backed domain, integrity, and concurrency tests
 
-**Exit criteria:** posted transactions are auditable and balanced; the chosen balance strategy is documented and protected by tests.
+**Exit criteria:** complete — posted transactions are auditable and balanced; the derived-balance strategy is documented and protected by tests.
 
 ## Phase 2 — Idempotent transfers
 
 **Goal:** complete one end-to-end money movement flow correctly.
 
-- Wallet-to-wallet transfer API
-- Explicit business validation and insufficient-funds handling
-- Idempotency key, request fingerprint, response replay, and conflict behavior
-- Deliberate concurrency control for competing debits
-- Transfer audit trail and domain events
+- **Complete:** wallet-to-wallet transfer API for PERSON and MERCHANT wallets
+- **Complete:** explicit business validation and insufficient-funds handling
+- **Complete:** idempotency key, canonical fingerprint, replay, and conflict behavior
+- **Complete:** ordered account locking for competing debits
+- **Complete:** transfer audit trail and immutable ledger records
 
-**Exit criteria:** repeated and concurrent requests cannot create duplicate transfers or violate the selected balance invariant.
+**Exit criteria:** complete — repeated and concurrent requests cannot create duplicate transfers or violate the balance invariant.
 
 ## Phase 3 — Payment reliability
 
 **Goal:** extend the core into resilient payment processing.
 
-- Payment state machine and merchant-scoped commands
-- Transactional outbox and reliable event publishing
-- Kafka integration and idempotent consumers
-- Refunds using compensating ledger transactions
+- **Complete:** payer-authorized PERSON-to-MERCHANT payments and merchant-scoped refunds
+- **Complete:** derived payment refund lifecycle and successful-result idempotency
+- **Complete:** transactional outbox, leased retry publisher, and per-payment event ordering
+- **Complete:** Kafka integration and a durable idempotent audit consumer
+- **Complete:** full/partial refunds using compensating immutable ledger journals
 
-**Exit criteria:** a committed financial operation and its event cannot silently diverge; duplicate events remain safe.
+**Exit criteria:** complete — a committed payment/refund and its event cannot silently diverge; duplicate events remain safe.
 
 ## Phase 4 — External effects and operations
 

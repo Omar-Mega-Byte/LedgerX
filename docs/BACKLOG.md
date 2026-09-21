@@ -20,14 +20,14 @@
 | FND-03 | P0 | **Complete** — enforce Java 21 and formatting checks | `verify` rejects unsupported Java versions and fails on unformatted Java sources |
 | TST-01 | P0 | **Complete** — establish database integration-test layers | A PostgreSQL Testcontainers `*IntegrationTest` verifies context startup and the Flyway migration |
 | CFG-01 | P0 | **Complete** — establish local/test/prod profile and secret conventions | `local` is the default; tracked configuration has no secrets; `.env.example` documents safe variables |
-| LGR-01 | P0 | Model monetary values, currencies, ledger accounts, transactions, and entries | No floating-point money; a posted transaction balances per currency |
-| WAL-01 | P0 | Add wallet/account ownership and a safe balance strategy | Authority of ledger versus any derived balance is documented and tested |
-| XFR-01 | P0 | Deliver an idempotent wallet-to-wallet transfer | Duplicate same-key requests have one effect; insufficient funds and concurrent debits preserve invariants |
+| LGR-01 | P0 | **Complete** — model exact money, currencies, ledger accounts, transactions, and entries | No floating-point money; a posted transaction balances per currency |
+| WAL-01 | P0 | **Complete** — add wallet/account ownership and a safe derived-balance strategy | Ledger is authoritative; derived balances, integrity, and concurrency controls are documented and tested |
+| XFR-01 | P0 | **Complete** — deliver idempotent wallet-to-wallet transfers | Duplicate same-key requests have one effect; insufficient funds and concurrent debits preserve invariants |
 | SEC-01 | P0 | Add authentication and object-level authorization for the first vertical slice | Users cannot access or move another user's funds |
-| REL-01 | P1 | Persist transactional outbox events with financial state changes | State and outbox event commit atomically; publisher retry behavior is tested |
-| REL-02 | P1 | Add Kafka publication and idempotent consumer handling | Duplicate delivery does not duplicate downstream business effects |
-| PAY-01 | P1 | Add a payment state machine and merchant-scoped idempotency | Valid transitions are explicit; invalid transitions are rejected |
-| RFD-01 | P1 | Support full and partial refunds with compensating ledger entries | Refund total cannot exceed the captured amount |
+| REL-01 | P1 | **Complete** — persist transactional outbox events with payment/refund state changes | Financial facts and outbox events commit atomically; leased retry behavior is tested |
+| REL-02 | P1 | **Complete** — add Kafka publication and idempotent consumer handling | Duplicate delivery produces one durable consumer receipt and no duplicate financial effect |
+| PAY-01 | P1 | **Complete** — add derived payment refund lifecycle and merchant-scoped idempotency | Valid payment/refund transitions are explicit; invalid commands are rejected |
+| RFD-01 | P1 | **Complete** — support full and partial refunds with compensating ledger entries | Refund total cannot exceed the original payment, including concurrent commands |
 | WHK-01 | P1 | Deliver signed webhooks with retry tracking | Signatures, retry schedule, failures, and manual replay are auditable |
 | OPS-01 | P1 | **Complete** — containerize local dependencies/application and add CI verification | Docker-based startup passes locally; GitHub Actions runs `verify` on pushes and pull requests; `main` requires its green check for pull requests |
 | COL-01 | P1 | **Complete** — establish contribution triage metadata | Type, priority, area, and triage labels exist; structured bug and feature issue forms are available |
