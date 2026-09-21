@@ -2,7 +2,7 @@
 
 LedgerX is a production-inspired Java backend for payment and digital-wallet workflows. It is being built as a portfolio project that emphasizes financial correctness: auditable money movement, duplicate prevention, safe concurrency, and reliable event processing.
 
-> **Project status:** foundation and documentation are in place. Application code, infrastructure, and domain features are not implemented yet.
+> **Project status:** the Spring Boot foundation, health endpoint, Java 21 build checks, and local configuration conventions are in place. Financial domain features and infrastructure integrations are not implemented yet.
 
 ## Why LedgerX
 
@@ -37,6 +37,9 @@ The first meaningful slice will establish a wallet/account model and a double-en
 ```text
 .
 ├── docs/                 # Architecture and development documentation
+├── src/                  # Spring Boot application and tests
+├── pom.xml               # Maven build and verification configuration
+├── mvnw.cmd              # Pinned Maven Wrapper for Windows
 ├── PROJECT_CONTEXT.txt   # Living product and engineering context
 └── TASKS.md              # Sequenced setup and delivery tasks
 ```
@@ -45,7 +48,16 @@ The Maven application structure will be added in the bootstrap task.
 
 ## Getting started
 
-There is no runnable application yet. The next setup milestone will add the Maven Wrapper and Spring Boot application; this section will then document the exact local commands and required services.
+Requires a Java 21 JDK. Maven does not need to be installed globally; the checked-in wrapper downloads its pinned Maven distribution on first use.
+
+```powershell
+.\mvnw.cmd verify
+.\mvnw.cmd spring-boot:run
+```
+
+Then check the application health at <http://localhost:8080/actuator/health>.
+
+See [configuration conventions](docs/configuration.md) for profiles, environment variables, and secret handling.
 
 For current direction and delivery sequencing, read:
 
@@ -53,6 +65,7 @@ For current direction and delivery sequencing, read:
 - [Development guide](docs/development.md)
 - [Delivery backlog](docs/BACKLOG.md)
 - [Delivery roadmap](docs/ROADMAP.md)
+- [Configuration conventions](docs/configuration.md)
 - [Living project context](PROJECT_CONTEXT.txt)
 - [Task list](TASKS.md)
 
