@@ -37,6 +37,7 @@ The first meaningful slice will establish a wallet/account model and a double-en
 ```text
 .
 ├── docs/                 # Architecture and development documentation
+├── compose.yaml          # Local PostgreSQL and containerized application
 ├── src/                  # Spring Boot application and tests
 ├── pom.xml               # Maven build and verification configuration
 ├── mvnw.cmd              # Pinned Maven Wrapper for Windows
@@ -51,13 +52,14 @@ The Maven application structure will be added in the bootstrap task.
 Requires a Java 21 JDK. Maven does not need to be installed globally; the checked-in wrapper downloads its pinned Maven distribution on first use.
 
 ```powershell
+docker compose up -d postgres
 .\mvnw.cmd verify
 .\mvnw.cmd spring-boot:run
 ```
 
 Then check the application health at <http://localhost:8080/actuator/health>.
 
-See [configuration conventions](docs/configuration.md) for profiles, environment variables, and secret handling.
+See [configuration conventions](docs/configuration.md) for profiles, environment variables, and secret handling. [Docker instructions](docs/docker.md) cover the local database and full containerized stack.
 
 For current direction and delivery sequencing, read:
 
@@ -66,6 +68,7 @@ For current direction and delivery sequencing, read:
 - [Delivery backlog](docs/BACKLOG.md)
 - [Delivery roadmap](docs/ROADMAP.md)
 - [Configuration conventions](docs/configuration.md)
+- [Docker instructions](docs/docker.md)
 - [Living project context](PROJECT_CONTEXT.txt)
 - [Task list](TASKS.md)
 

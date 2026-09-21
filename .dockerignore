@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+.serena
+.vscode
+docs
+target/*
+!target/*.jar
+*.log
+.env
