@@ -9,7 +9,8 @@
 - **Complete:** repository hygiene, README, architecture notes, backlog, and roadmap
 - **Complete:** Spring Boot/Maven bootstrap, context-load test, and health endpoint
 - **Complete:** Java 21 quality baseline, local/test/prod configuration conventions, and secret handling
-- Remaining: Docker Compose PostgreSQL, Flyway, database test layers, container build, and CI
+- **Complete:** Docker Compose PostgreSQL, Flyway V1 migration, Testcontainers database test, and container build
+- **Configured:** GitHub Actions verification workflow; its first remote run remains pending until the repository is pushed
 
 **Exit criteria:** a clean checkout can run documented verification and local infrastructure without tracking credentials or generated artifacts.
 
