@@ -1,6 +1,11 @@
 # Phase 2 — Idempotent Wallet Transfers API
 
-**Status: design confirmed for later implementation.**
+**Status: implemented and verified.**
+
+Phase 2 is delivered on `codex/phase-2-transfer-design`: V4/V5 migrations, the atomic transfer
+application service, idempotency replay, the development-only HTTP ownership seam, and focused
+unit/PostgreSQL/MockMvc coverage are all present. The Phase 2 security warning remains in force:
+`X-LedgerX-Owner-Id` is forgeable and is not suitable for public deployment.
 
 ## 1. Goal
 
@@ -207,7 +212,9 @@ Phase 2 adds versioned Flyway migrations after V3.
 | Table | Purpose and columns | Integrity and indexes |
 |---|---|---|
 | transfers | id UUID PK; source_wallet_account_id; destination_wallet_account_id; amount NUMERIC(19,2); currency; ledger_transaction_id; completed_at. | source != destination, amount > 0, currency USD; composite FKs from each wallet/currency to ledger_accounts and from ledger transaction/currency to ledger_transactions; unique ledger_transaction_id; source/destination history indexes ordered by completed_at; immutable UPDATE/DELETE trigger. |
-| transfer_idempotency | id UUID PK; owner_id FK; idempotency_key; request_fingerprint CHAR(64); state PROCESSING/COMPLETED; transfer_id nullable until completion; created_at; completed_at nullable. | unique (owner_id, idempotency_key), unique transfer_id, non-blank key, hexadecimal fingerprint, valid state/transfer timestamp combination; trigger makes scope/key/fingerprint immutable and permits only PROCESSING -> COMPLETED transition. |
+| transfer_idempotency | id UUID PK; owner_id FK; idempotency_key; request_fingerprint VARCHAR(64); state PROCESSING/COMPLETED; transfer_id nullable until completion; created_at; completed_at nullable. | unique (owner_id, idempotency_key), unique transfer_id, non-blank key, exactly 64 lowercase hexadecimal fingerprint, valid state/transfer timestamp combination; trigger makes scope/key/fingerprint immutable and permits only PROCESSING -> COMPLETED transition. |
+
+`request_fingerprint` uses `VARCHAR(64)` rather than a padded PostgreSQL `CHAR(64)`. The constraint enforces its exact 64-character SHA-256 representation while avoiding fixed-width padding semantics and keeping Hibernate schema validation aligned with the JDBC type.
 
 No separate client-reference column is needed: transfer.id is the stable public reference, while Idempotency-Key is transport deduplication metadata rather than a business identifier.
 
