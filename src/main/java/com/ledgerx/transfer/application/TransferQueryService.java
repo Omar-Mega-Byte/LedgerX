@@ -1,8 +1,8 @@
 package com.ledgerx.transfer.application;
 
+import com.ledgerx.access.OwnerContext;
 import com.ledgerx.ledger.domain.LedgerAccount;
 import com.ledgerx.ledger.persistence.LedgerAccountRepository;
-import com.ledgerx.transfer.domain.OwnerContext;
 import com.ledgerx.transfer.domain.Transfer;
 import com.ledgerx.transfer.domain.TransferNotFoundException;
 import com.ledgerx.transfer.persistence.TransferRepository;

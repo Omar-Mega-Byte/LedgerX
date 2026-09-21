@@ -1,10 +1,10 @@
 package com.ledgerx.transfer.api;
 
+import com.ledgerx.access.OwnerContext;
 import com.ledgerx.money.Money;
 import com.ledgerx.transfer.application.TransferApplicationService;
 import com.ledgerx.transfer.application.TransferExecution;
 import com.ledgerx.transfer.application.TransferQueryService;
-import com.ledgerx.transfer.domain.OwnerContext;
 import com.ledgerx.transfer.domain.TransferCommand;
 import com.ledgerx.transfer.domain.TransferValidationException;
 import io.swagger.v3.oas.annotations.Operation;

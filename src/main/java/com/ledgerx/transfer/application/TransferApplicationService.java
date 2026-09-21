@@ -1,5 +1,6 @@
 package com.ledgerx.transfer.application;
 
+import com.ledgerx.access.OwnerContext;
 import com.ledgerx.ledger.application.LedgerPostingService;
 import com.ledgerx.ledger.domain.EntrySide;
 import com.ledgerx.ledger.domain.LedgerAccount;
@@ -9,7 +10,6 @@ import com.ledgerx.transfer.domain.IdempotencyFingerprint;
 import com.ledgerx.transfer.domain.IdempotencyKeyReuseException;
 import com.ledgerx.transfer.domain.IdempotencyRequestInProgressException;
 import com.ledgerx.transfer.domain.IdempotencyState;
-import com.ledgerx.transfer.domain.OwnerContext;
 import com.ledgerx.transfer.domain.Transfer;
 import com.ledgerx.transfer.domain.TransferAuthorizationException;
 import com.ledgerx.transfer.domain.TransferCommand;
