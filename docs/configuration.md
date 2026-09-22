@@ -21,11 +21,23 @@ The initial profiles are intentionally minimal:
 
 ## Environment variables and secrets
 
-- Use uppercase, underscore-separated names. Application-owned settings use the `LEDGERX_` prefix, for example `LEDGERX_AUTH_JWT_SECRET`.
+- Use uppercase, underscore-separated names. Application-owned settings use the `LEDGERX_` prefix, for example `LEDGERX_OIDC_ISSUER_URI`.
 - Keep safe, non-secret examples in `.env.example`. The real `.env` file is ignored and must never be committed.
 - Spring Boot does not load `.env` by itself. Supply variables through the shell, IDE run configuration, Docker Compose, or a deployment secret manager.
 - Never provide real credentials, API keys, JWT signing material, private keys, or production endpoints as defaults in tracked configuration.
 - Log configuration decisions without logging secret values.
+
+## Production identity
+
+The `prod` profile requires `LEDGERX_OIDC_ISSUER_URI` and validates Keycloak JWTs against that
+issuer's published keys. It also requires the `ledgerx-api` audience by default. Each authenticated
+user who may call LedgerX must have a Keycloak `ledgerx_owner_id` user attribute whose value is the
+UUID of an existing LedgerX wallet owner. The imported realm maps that attribute into a signed access
+token claim of the same name.
+
+This is an administrator-provisioned identity-to-owner mapping, not a public registration or wallet
+funding mechanism. Keep the bootstrap administrator and database passwords only in the ignored
+`.env` file or a deployment secret store.
 
 ## Health endpoint
 

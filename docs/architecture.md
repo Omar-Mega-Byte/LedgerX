@@ -12,7 +12,7 @@ The current modules are:
 
 | Area | Responsibility |
 |---|---|
-| Access and wallet | Development-only caller context plus active PERSON/MERCHANT wallet ownership |
+| Access and wallet | Keycloak-signed production caller context, local/test development seam, and active PERSON/MERCHANT wallet ownership |
 | Wallet and ledger | Accounts, derived balances, immutable ledger transactions, and entries |
 | Transfers | Idempotent USD wallet-to-wallet transfers |
 | Payments | PERSON-to-MERCHANT payments, compensating refunds, and derived refund state |
@@ -57,13 +57,25 @@ idempotent consumers process downstream effects
 
 The database is the source of truth for committed financial state. Kafka is used for asynchronous propagation, not as the sole record of money movement.
 
+## Authentication boundary
+
+The `prod` profile runs LedgerX as an OAuth2 resource server. Caddy terminates TLS, Keycloak issues
+signed JWTs, and LedgerX validates the issuer and `ledgerx-api` audience before a controller runs.
+The signed `ledgerx_owner_id` claim maps the authenticated Keycloak user to a pre-existing
+`wallet_owners.id`; the claim is resolved into `OwnerContext` before entering financial application
+services. This keeps HTTP/OIDC concerns out of transfer and payment rules.
+
+The `X-LedgerX-Owner-Id` header remains for local and test profiles only. It is forgeable and must
+never be treated as authentication. In production it is ignored whenever a JWT is present, and an
+unauthenticated request is rejected by the resource-server filter chain.
+
 ## Decisions to defer
 
 The following need evidence from real use cases before being fixed:
 
 - module/service extraction boundaries;
 - Redis usage and cache authority;
-- authentication mechanism and external identity integration.
+- end-user application clients and onboarding flows (Keycloak is the deployed identity provider).
 - payment-provider authorization, capture, fees, settlement, chargebacks, and FX;
 - webhook delivery/replay operations and reconciliation policy;
 - event retention and dead-letter operations policy.
