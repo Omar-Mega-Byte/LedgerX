@@ -2,7 +2,9 @@
 
 LedgerX is a production-inspired Java backend for payment and digital-wallet workflows. It is being built as a portfolio project that emphasizes financial correctness: auditable money movement, duplicate prevention, safe concurrency, and reliable event processing.
 
-> **Project status:** the Spring Boot foundation, health endpoint, Java 21 build checks, and local configuration conventions are in place. Financial domain features and infrastructure integrations are not implemented yet.
+> **Project status:** Phases 1–3 are implemented: USD wallet ownership, immutable double-entry
+> journals, idempotent transfers, merchant payments/refunds, transactional outbox delivery, and
+> Kafka consumer deduplication. Production deployment uses Keycloak-signed JWTs and Caddy HTTPS.
 
 ## Why LedgerX
 
@@ -20,7 +22,7 @@ The primary design goals are:
 
 - Java 21+, Spring Boot, Maven
 - PostgreSQL, Flyway, Spring Data JPA
-- Spring Security, REST APIs, validation, Actuator, OpenAPI
+- Spring Security resource server, Keycloak/OIDC, REST APIs, validation, Actuator, OpenAPI
 - Redis and Apache Kafka where they solve concrete reliability or performance needs
 - Docker Compose for local dependencies
 - JUnit 5, Mockito, Spring Boot Test, and Testcontainers
@@ -45,7 +47,8 @@ The first meaningful slice is an idempotent wallet-to-wallet transfer backed by 
 └── TASKS.md              # Sequenced setup and delivery tasks
 ```
 
-The Maven application structure and Phase 0 development foundation are in place. Phases 1–3 add the ledger/wallet core, idempotent transfers, and reliable merchant payments/refunds.
+The Maven application structure and Phases 1–3 are complete. The project runs as a modular monolith;
+PostgreSQL is the financial source of truth and Kafka carries committed payment/refund events.
 
 ## Getting started
 
@@ -60,6 +63,7 @@ docker compose up -d postgres
 Then check the application health at <http://localhost:8080/actuator/health>.
 
 See [configuration conventions](docs/configuration.md) for profiles, environment variables, and secret handling. [Docker instructions](docs/docker.md) cover the local database and full containerized stack.
+For the self-hosted public stack, use [the production deployment guide](docs/production-deployment.md).
 
 For current direction and delivery sequencing, read:
 

@@ -15,17 +15,22 @@ The named `postgres-data` volume preserves local data. To stop the service witho
 
 ## Application container
 
-Build the executable JAR first, then build and start the full stack:
+Build and start the full local stack:
 
 ```powershell
 .\mvnw.cmd verify
 docker compose up --build
 ```
 
-The application waits for PostgreSQL health, runs Flyway before accepting traffic, and exposes `http://localhost:8080/actuator/health`. The container runs as a non-root `ledgerx` user.
+The multi-stage Dockerfile uses a pinned Maven/Java 21 builder to create the executable JAR inside
+Docker, so a host-built JAR is not required. The application waits for PostgreSQL health, runs
+Flyway before accepting traffic, and exposes `http://localhost:8080/actuator/health`. The container
+runs as a non-root `ledgerx` user.
 
 To remove the local database volume as well, run `docker compose down --volumes`. This permanently removes local development data.
 
 ## Image policy
 
-Compose and Testcontainers use the same pinned PostgreSQL image, `postgres:17.11-alpine3.24`. Docker uses a locally cached image when available and downloads it only when it is absent. The application image is based on `eclipse-temurin:21-jre-alpine`.
+Compose and Testcontainers use the same pinned PostgreSQL image, `postgres:17.11-alpine3.24`. Docker uses a locally cached image when available and downloads it only when it is absent. The application image uses a Java 21 build stage and an `eclipse-temurin:21-jre-alpine` runtime stage.
+
+For the public self-hosted Compose stack with Caddy and Keycloak, see [the production deployment guide](production-deployment.md).

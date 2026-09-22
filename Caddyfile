@@ -1,0 +1,13 @@
+{
+	email {$CADDY_ACME_EMAIL}
+}
+
+{$LEDGERX_PUBLIC_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy ledgerx:8080
+}
+
+{$KEYCLOAK_PUBLIC_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy keycloak:8080
+}
