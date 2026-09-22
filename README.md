@@ -2,9 +2,10 @@
 
 LedgerX is a production-inspired Java backend for payment and digital-wallet workflows. It is being built as a portfolio project that emphasizes financial correctness: auditable money movement, duplicate prevention, safe concurrency, and reliable event processing.
 
-> **Project status:** Phases 1–3 are implemented: USD wallet ownership, immutable double-entry
-> journals, idempotent transfers, merchant payments/refunds, transactional outbox delivery, and
-> Kafka consumer deduplication. Production deployment uses Keycloak-signed JWTs and Caddy HTTPS.
+> **Project status:** Phases 1–4 are implemented: USD wallet ownership, immutable double-entry
+> journals, idempotent transfers, merchant payments/refunds, transactional outbox/Kafka delivery,
+> and merchant-owned signed webhook delivery with retries, replay, and reconciliation evidence.
+> Production deployment uses Keycloak-signed JWTs and Caddy HTTPS.
 
 ## Why LedgerX
 

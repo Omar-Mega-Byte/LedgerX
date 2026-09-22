@@ -13,6 +13,12 @@ import com.ledgerx.transfer.domain.IdempotencyRequestInProgressException;
 import com.ledgerx.transfer.domain.TransferAuthorizationException;
 import com.ledgerx.transfer.domain.TransferNotFoundException;
 import com.ledgerx.transfer.domain.WalletNotFoundException;
+import com.ledgerx.webhook.WebhookAuthorizationException;
+import com.ledgerx.webhook.WebhookDeliveryConflictException;
+import com.ledgerx.webhook.WebhookIdempotencyKeyReuseException;
+import com.ledgerx.webhook.WebhookIdempotencyRequestInProgressException;
+import com.ledgerx.webhook.WebhookNotFoundException;
+import com.ledgerx.webhook.WebhookValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
@@ -72,6 +78,19 @@ public class GlobalExceptionHandler {
     return error(HttpStatus.NOT_FOUND, code, message, request, List.of());
   }
 
+  @ExceptionHandler(WebhookNotFoundException.class)
+  public ResponseEntity<ApiError> handleWebhookNotFound(
+      WebhookNotFoundException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.NOT_FOUND,
+        request.getRequestURI().contains("/deliveries/")
+            ? "WEBHOOK_DELIVERY_NOT_FOUND"
+            : "WEBHOOK_ENDPOINT_NOT_FOUND",
+        "webhook resource was not found",
+        request,
+        List.of());
+  }
+
   @ExceptionHandler(TransferAuthorizationException.class)
   public ResponseEntity<ApiError> handleTransferAuthorization(
       TransferAuthorizationException exception, HttpServletRequest request) {
@@ -101,6 +120,17 @@ public class GlobalExceptionHandler {
         HttpStatus.FORBIDDEN, "PAYMENT_NOT_AUTHORIZED", exception.getMessage(), request, List.of());
   }
 
+  @ExceptionHandler(WebhookAuthorizationException.class)
+  public ResponseEntity<ApiError> handleWebhookAuthorization(
+      WebhookAuthorizationException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.FORBIDDEN,
+        "WEBHOOK_NOT_AUTHORIZED",
+        "caller is not authorized to manage webhooks",
+        request,
+        List.of());
+  }
+
   @ExceptionHandler(RefundAuthorizationException.class)
   public ResponseEntity<ApiError> handleRefundAuthorization(
       RefundAuthorizationException exception, HttpServletRequest request) {
@@ -119,7 +149,22 @@ public class GlobalExceptionHandler {
         List.of());
   }
 
-  @ExceptionHandler({IdempotencyKeyReuseException.class, PaymentIdempotencyKeyReuseException.class})
+  @ExceptionHandler(WebhookValidationException.class)
+  public ResponseEntity<ApiError> handleWebhookValidation(
+      WebhookValidationException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        "WEBHOOK_NOT_PROCESSABLE",
+        exception.getMessage(),
+        request,
+        List.of());
+  }
+
+  @ExceptionHandler({
+    IdempotencyKeyReuseException.class,
+    PaymentIdempotencyKeyReuseException.class,
+    WebhookIdempotencyKeyReuseException.class
+  })
   public ResponseEntity<ApiError> handleIdempotencyReuse(
       Exception exception, HttpServletRequest request) {
     return error(
@@ -132,14 +177,20 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler({
     IdempotencyRequestInProgressException.class,
-    PaymentIdempotencyRequestInProgressException.class
+    PaymentIdempotencyRequestInProgressException.class,
+    WebhookIdempotencyRequestInProgressException.class,
+    WebhookDeliveryConflictException.class
   })
   public ResponseEntity<ApiError> handleIdempotencyInProgress(
       Exception exception, HttpServletRequest request) {
     return error(
         HttpStatus.CONFLICT,
-        "IDEMPOTENCY_REQUEST_IN_PROGRESS",
-        "idempotency request is still processing",
+        exception instanceof WebhookDeliveryConflictException
+            ? "WEBHOOK_DELIVERY_CONFLICT"
+            : "IDEMPOTENCY_REQUEST_IN_PROGRESS",
+        exception instanceof WebhookDeliveryConflictException
+            ? exception.getMessage()
+            : "idempotency request is still processing",
         request,
         List.of());
   }
