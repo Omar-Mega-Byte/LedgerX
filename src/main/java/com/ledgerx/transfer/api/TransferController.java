@@ -1,6 +1,6 @@
 package com.ledgerx.transfer.api;
 
-import com.ledgerx.access.OwnerContext;
+import com.ledgerx.access.OwnerContextResolver;
 import com.ledgerx.api.ApiError;
 import com.ledgerx.api.MalformedRequestException;
 import com.ledgerx.api.MoneyRequest;
@@ -26,6 +26,8 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,10 +37,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Development-only HTTP boundary. X-LedgerX-Owner-Id is forgeable and must be replaced by an
- * authenticated principal before public deployment.
- */
+/** HTTP boundary for transfers, with profile-specific caller identity resolution. */
 @Validated
 @RestController
 @RequestMapping("/api/v1/transfers")
@@ -52,12 +51,15 @@ public class TransferController {
 
   private final TransferApplicationService transferApplicationService;
   private final TransferQueryService transferQueryService;
+  private final OwnerContextResolver ownerContextResolver;
 
   public TransferController(
       TransferApplicationService transferApplicationService,
-      TransferQueryService transferQueryService) {
+      TransferQueryService transferQueryService,
+      OwnerContextResolver ownerContextResolver) {
     this.transferApplicationService = transferApplicationService;
     this.transferQueryService = transferQueryService;
+    this.ownerContextResolver = ownerContextResolver;
   }
 
   @PostMapping
@@ -199,12 +201,13 @@ public class TransferController {
       @Parameter(
               name = OWNER_HEADER,
               in = ParameterIn.HEADER,
-              required = true,
+              required = false,
               example = "11111111-1111-1111-1111-111111111111",
               description =
-                  "Development-only, forgeable owner UUID. It must own the source wallet and is not authentication.")
-          @RequestHeader(OWNER_HEADER)
+                  "Required only for local/test use. It is a forgeable development owner UUID, not authentication. In production, a Keycloak-signed ledgerx_owner_id claim is required instead.")
+          @RequestHeader(value = OWNER_HEADER, required = false)
           String ownerHeader,
+      @AuthenticationPrincipal Jwt authenticatedToken,
       @Parameter(
               name = IDEMPOTENCY_HEADER,
               in = ParameterIn.HEADER,
@@ -239,7 +242,7 @@ public class TransferController {
           TransferRequest request) {
     TransferExecution execution =
         transferApplicationService.transfer(
-            ownerContext(ownerHeader),
+            ownerContextResolver.resolve(ownerHeader, authenticatedToken),
             new TransferCommand(
                 request.sourceWalletId(),
                 request.destinationWalletId(),
@@ -293,11 +296,13 @@ public class TransferController {
       @Parameter(
               name = OWNER_HEADER,
               in = ParameterIn.HEADER,
-              required = true,
+              required = false,
               example = "11111111-1111-1111-1111-111111111111",
-              description = "Development-only, forgeable owner UUID; not authentication.")
-          @RequestHeader(OWNER_HEADER)
+              description =
+                  "Required only for local/test use. Production uses the Keycloak-signed ledgerx_owner_id claim.")
+          @RequestHeader(value = OWNER_HEADER, required = false)
           String ownerHeader,
+      @AuthenticationPrincipal Jwt authenticatedToken,
       @Parameter(
               name = "transferId",
               in = ParameterIn.PATH,
@@ -307,15 +312,8 @@ public class TransferController {
           @PathVariable
           UUID transferId) {
     return TransferResponse.from(
-        transferQueryService.findForOwner(transferId, ownerContext(ownerHeader)));
-  }
-
-  private OwnerContext ownerContext(String ownerHeader) {
-    try {
-      return new OwnerContext(UUID.fromString(ownerHeader));
-    } catch (IllegalArgumentException exception) {
-      throw new MalformedRequestException("owner header must be a UUID", exception);
-    }
+        transferQueryService.findForOwner(
+            transferId, ownerContextResolver.resolve(ownerHeader, authenticatedToken)));
   }
 
   private Money toMoney(MoneyRequest request) {
