@@ -16,3 +16,6 @@ ledgerx:
     consumer-enabled: true
   outbox:
     publisher-enabled: true
+  webhooks:
+    allow-http: true
+    allow-local-targets: true
