@@ -1,6 +1,7 @@
 package com.ledgerx.payment.api;
 
 import com.ledgerx.access.OwnerContext;
+import com.ledgerx.access.OwnerContextResolver;
 import com.ledgerx.api.ApiError;
 import com.ledgerx.api.MalformedRequestException;
 import com.ledgerx.api.MoneyRequest;
@@ -29,6 +30,8 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,7 +41,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Development-only API. Its owner header is forgeable and is not real authentication. */
+/** HTTP boundary for payments and refunds, with profile-specific caller identity resolution. */
 @Validated
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -54,14 +57,17 @@ public class PaymentController {
   private final PaymentApplicationService paymentApplicationService;
   private final RefundApplicationService refundApplicationService;
   private final PaymentQueryService paymentQueryService;
+  private final OwnerContextResolver ownerContextResolver;
 
   public PaymentController(
       PaymentApplicationService paymentApplicationService,
       RefundApplicationService refundApplicationService,
-      PaymentQueryService paymentQueryService) {
+      PaymentQueryService paymentQueryService,
+      OwnerContextResolver ownerContextResolver) {
     this.paymentApplicationService = paymentApplicationService;
     this.refundApplicationService = refundApplicationService;
     this.paymentQueryService = paymentQueryService;
+    this.ownerContextResolver = ownerContextResolver;
   }
 
   @PostMapping
@@ -115,11 +121,13 @@ public class PaymentController {
       @Parameter(
               name = OWNER_HEADER,
               in = ParameterIn.HEADER,
-              required = true,
+              required = false,
               example = "11111111-1111-1111-1111-111111111111",
-              description = "Development-only, forgeable owner UUID. It is not authentication.")
-          @RequestHeader(OWNER_HEADER)
+              description =
+                  "Required only for local/test use. It is a forgeable development owner UUID, not authentication. In production, a Keycloak-signed ledgerx_owner_id claim is required instead.")
+          @RequestHeader(value = OWNER_HEADER, required = false)
           String ownerHeader,
+      @AuthenticationPrincipal Jwt authenticatedToken,
       @Parameter(
               name = IDEMPOTENCY_HEADER,
               in = ParameterIn.HEADER,
@@ -150,7 +158,7 @@ public class PaymentController {
           @Valid
           @RequestBody
           PaymentRequest request) {
-    OwnerContext ownerContext = ownerContext(ownerHeader);
+    OwnerContext ownerContext = ownerContextResolver.resolve(ownerHeader, authenticatedToken);
     PaymentExecution execution =
         paymentApplicationService.create(
             ownerContext,
@@ -190,14 +198,17 @@ public class PaymentController {
       @Parameter(
               name = OWNER_HEADER,
               in = ParameterIn.HEADER,
-              required = true,
+              required = false,
               example = "11111111-1111-1111-1111-111111111111",
-              description = "Development-only, forgeable owner UUID. It is not authentication.")
-          @RequestHeader(OWNER_HEADER)
+              description =
+                  "Required only for local/test use. Production uses the Keycloak-signed ledgerx_owner_id claim.")
+          @RequestHeader(value = OWNER_HEADER, required = false)
           String ownerHeader,
+      @AuthenticationPrincipal Jwt authenticatedToken,
       @PathVariable UUID paymentId) {
     return PaymentResponse.from(
-        paymentQueryService.findForOwner(paymentId, ownerContext(ownerHeader)));
+        paymentQueryService.findForOwner(
+            paymentId, ownerContextResolver.resolve(ownerHeader, authenticatedToken)));
   }
 
   @PostMapping("/{paymentId}/refunds")
@@ -233,12 +244,13 @@ public class PaymentController {
       @Parameter(
               name = OWNER_HEADER,
               in = ParameterIn.HEADER,
-              required = true,
+              required = false,
               example = "22222222-2222-2222-2222-222222222222",
               description =
-                  "Development-only, forgeable merchant owner UUID. It is not authentication.")
-          @RequestHeader(OWNER_HEADER)
+                  "Required only for local/test use. Production uses the Keycloak-signed ledgerx_owner_id claim.")
+          @RequestHeader(value = OWNER_HEADER, required = false)
           String ownerHeader,
+      @AuthenticationPrincipal Jwt authenticatedToken,
       @Parameter(
               name = IDEMPOTENCY_HEADER,
               in = ParameterIn.HEADER,
@@ -265,7 +277,7 @@ public class PaymentController {
           RefundRequest request) {
     RefundExecution execution =
         refundApplicationService.create(
-            ownerContext(ownerHeader),
+            ownerContextResolver.resolve(ownerHeader, authenticatedToken),
             new RefundCommand(paymentId, toMoney(request.money()), idempotencyKey));
     RefundResponse response = RefundResponse.from(execution.refund());
     if (execution.replayed()) {
@@ -274,14 +286,6 @@ public class PaymentController {
     return ResponseEntity.created(
             URI.create("/api/v1/payments/" + paymentId + "/refunds/" + response.refundId()))
         .body(response);
-  }
-
-  private OwnerContext ownerContext(String ownerHeader) {
-    try {
-      return new OwnerContext(UUID.fromString(ownerHeader));
-    } catch (IllegalArgumentException exception) {
-      throw new MalformedRequestException("owner header must be a UUID", exception);
-    }
   }
 
   private Money toMoney(MoneyRequest request) {

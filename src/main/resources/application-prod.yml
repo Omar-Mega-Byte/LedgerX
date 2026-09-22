@@ -6,6 +6,12 @@ spring:
     url: ${LEDGERX_DB_URL}
     username: ${LEDGERX_DB_USERNAME}
     password: ${LEDGERX_DB_PASSWORD}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${LEDGERX_OIDC_ISSUER_URI}
+          audiences: ${LEDGERX_OIDC_API_CLIENT_ID:ledgerx-api}
 
 server:
   shutdown: graceful
