@@ -1,5 +1,6 @@
 package com.ledgerx.api;
 
+import com.ledgerx.access.OwnerIdentityException;
 import com.ledgerx.ledger.domain.FinancialValidationException;
 import com.ledgerx.ledger.domain.UnknownLedgerAccountException;
 import com.ledgerx.payment.domain.PaymentAuthorizationException;
@@ -78,6 +79,17 @@ public class GlobalExceptionHandler {
         HttpStatus.FORBIDDEN,
         "TRANSFER_NOT_AUTHORIZED",
         "caller does not own the source wallet",
+        request,
+        List.of());
+  }
+
+  @ExceptionHandler(OwnerIdentityException.class)
+  public ResponseEntity<ApiError> handleOwnerIdentity(
+      OwnerIdentityException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.FORBIDDEN,
+        "OWNER_IDENTITY_INVALID",
+        "authenticated caller is not linked to a LedgerX wallet owner",
         request,
         List.of());
   }

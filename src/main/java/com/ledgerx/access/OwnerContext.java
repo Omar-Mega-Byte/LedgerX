@@ -4,8 +4,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Development-time caller ownership context. HTTP currently obtains it from a forgeable header;
- * real authentication will replace that adapter without changing financial application services.
+ * Authenticated caller ownership context passed to financial application services. HTTP resolves it
+ * from a Keycloak-signed JWT in production and from the development header in local/test.
  */
 public record OwnerContext(UUID ownerId) {
 
