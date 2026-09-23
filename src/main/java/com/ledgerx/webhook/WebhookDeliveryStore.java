@@ -290,13 +290,14 @@ public class WebhookDeliveryStore {
     jdbcTemplate.update(
         """
         INSERT INTO ledgerx.webhook_delivery_attempts (
-            id, webhook_delivery_id, attempt_number, started_at, completed_at, outcome, http_status,
-            duration_millis, error_category
+            id, webhook_delivery_id, replay_count, attempt_number, started_at, completed_at,
+            outcome, http_status, duration_millis, error_category
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         UUID.randomUUID(),
         delivery.id(),
+        delivery.replayCount(),
         delivery.attemptCount(),
         Timestamp.from(startedAt),
         Timestamp.from(completedAt),
