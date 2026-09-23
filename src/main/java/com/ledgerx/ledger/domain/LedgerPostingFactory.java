@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class LedgerPostingFactory {
 
+  // ledger_entries.amount is NUMERIC(19,2): seventeen integral digits and two fractional digits.
+  private static final BigDecimal MAX_ENTRY_AMOUNT = new BigDecimal("99999999999999999.99");
+
   private final Clock clock;
 
   public LedgerPostingFactory(Clock clock) {
@@ -35,6 +38,9 @@ public class LedgerPostingFactory {
     for (PostingLine line : postingLines) {
       if (!line.amount().isPositive()) {
         throw new FinancialValidationException("ledger entry amount must be positive");
+      }
+      if (line.amount().amount().compareTo(MAX_ENTRY_AMOUNT) > 0) {
+        throw new FinancialValidationException("ledger entry amount exceeds the supported maximum");
       }
       if (line.amount().currency() != currency) {
         throw new FinancialValidationException("all ledger entries must have the same currency");
