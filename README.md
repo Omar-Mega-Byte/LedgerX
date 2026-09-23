@@ -19,28 +19,29 @@ The primary design goals are:
 - reliable asynchronous processing through a transactional outbox and idempotent consumers;
 - auditability, security, and operational visibility suitable for a production-inspired system.
 
-## Planned stack
+## Stack
 
 - Java 21+, Spring Boot, Maven
 - PostgreSQL, Flyway, Spring Data JPA
 - Spring Security resource server, Keycloak/OIDC, REST APIs, validation, Actuator, OpenAPI
-- Redis and Apache Kafka where they solve concrete reliability or performance needs
+- Apache Kafka for committed payment and refund events
 - Docker Compose for local dependencies
 - JUnit 5, Mockito, Spring Boot Test, and Testcontainers
 - GitHub Actions for verification; pull requests to `main` require the green `Verify` check
 
-These choices are directional, not commitments. See [the architecture notes](docs/architecture.md) for the intended shape and [the development guide](docs/development.md) for conventions.
+See [the architecture notes](docs/architecture.md) and [the development guide](docs/development.md) for the implemented shape and conventions. Redis remains outside the current scope.
 
-## Planned first vertical slice
+## Financial core
 
-The first meaningful slice is an idempotent wallet-to-wallet transfer backed by an immutable double-entry ledger. It will demonstrate explicit money types, balanced entries, atomic persistence, insufficient-funds handling, and idempotent requests before broader payment features are added. The [foundation record](docs/FOUNDATION.md) explains the implementation order and guardrails.
+The first slice is an idempotent wallet-to-wallet transfer backed by an immutable double-entry ledger. Payments, refunds, transactional outbox events, and signed merchant webhooks build on that core. The [foundation record](docs/FOUNDATION.md) explains the implementation order and guardrails.
 
 ## Repository layout
 
 ```text
 .
 ├── docs/                 # Architecture and development documentation
-├── compose.yaml          # Local PostgreSQL and containerized application
+├── compose.yaml          # Local PostgreSQL, Kafka, and containerized application
+├── compose.production.yaml # Private dependencies behind Caddy HTTPS
 ├── src/                  # Spring Boot application and tests
 ├── pom.xml               # Maven build and verification configuration
 ├── mvnw.cmd              # Pinned Maven Wrapper for Windows
@@ -48,20 +49,21 @@ The first meaningful slice is an idempotent wallet-to-wallet transfer backed by 
 └── TASKS.md              # Sequenced setup and delivery tasks
 ```
 
-The Maven application structure and Phases 1–3 are complete. The project runs as a modular monolith;
-PostgreSQL is the financial source of truth and Kafka carries committed payment/refund events.
+The project runs as a modular monolith. PostgreSQL is the financial source of truth and Kafka carries committed payment/refund events.
 
 ## Getting started
 
 Requires a Java 21 JDK. Maven does not need to be installed globally; the checked-in wrapper downloads its pinned Maven distribution on first use.
 
 ```powershell
-docker compose up -d postgres
-.\mvnw.cmd verify
+docker compose up -d postgres kafka
+.\mvnw.cmd clean verify
 .\mvnw.cmd spring-boot:run
 ```
 
 Then check the application health at <http://localhost:8080/actuator/health>.
+The complete verification uses Docker-backed PostgreSQL and Kafka Testcontainers. It runs unit,
+API, database, messaging, security, and concurrency tests without a separate Keycloak process.
 
 See [configuration conventions](docs/configuration.md) for profiles, environment variables, and secret handling. [Docker instructions](docs/docker.md) cover the local database and full containerized stack.
 For the self-hosted public stack, use [the production deployment guide](docs/production-deployment.md).
