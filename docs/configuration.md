@@ -53,6 +53,9 @@ explicitly allow HTTP and local mock targets for development. A receiver validat
 
 `LEDGERX_RECONCILIATION_ENABLED` enables the scheduled read-only integrity checks. These checks record
 findings for operators but never repair, compensate, or mutate money movement.
+The production Compose service forwards these webhook and reconciliation variables from the private
+deployment environment file. Leave the workers disabled until the encryption key and an outbound
+network policy for merchant HTTPS destinations are configured.
 
 ## Health endpoint
 

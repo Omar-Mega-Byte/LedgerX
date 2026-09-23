@@ -9,6 +9,9 @@ network.
 
 1. Copy `.env.example` to the ignored `.env` file. Replace every `CHANGE_ME` value with a long,
    unique password or email address. Do not commit `.env`.
+   Replace `LEDGERX_WEBHOOK_ENCRYPTION_KEY` with a base64-encoded 32-byte key before enabling
+   webhook workers. The production Compose service passes the webhook and reconciliation settings
+   from this file into LedgerX.
 2. Register a second public DNS name for the LedgerX API and place it in `LEDGERX_PUBLIC_DOMAIN`.
    `KEYCLOAK_PUBLIC_DOMAIN` is already set to `ledgerx-auth-elrfaay.duckdns.org`; both names must
    resolve to this server's public IP address.

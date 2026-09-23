@@ -2,6 +2,20 @@
 
 **Status: implemented and verified on 2026-09-23.**
 
+## Stabilization record (2026-09-23)
+
+The Phase 4 stabilization pass added a forward-only V10 migration. Webhook delivery attempt
+numbers restart for each manual replay, so attempt history is now unique by delivery, replay
+cycle, and attempt number. Existing attempt rows receive replay cycle zero. This preserves the
+append-only audit trail and permits a replay after a terminal failure without changing its public
+event ID or payload.
+
+The dispatcher now treats a database outcome-write failure as a service failure instead of
+misclassifying it as a receiver failure and trying to write a second outcome. PostgreSQL tests
+cover receipt/delivery atomicity, duplicate and concurrent event enqueueing, immutable payloads
+and attempts, ordered replay, and production JWT ownership checks. The production Compose file
+forwards the documented webhook and reconciliation settings to LedgerX.
+
 ## 1. Goal
 
 Turn LedgerX's committed payment and refund events into a safe, observable external contract without
