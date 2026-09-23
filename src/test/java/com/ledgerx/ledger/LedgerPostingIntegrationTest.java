@@ -69,7 +69,10 @@ class LedgerPostingIntegrationTest {
   @BeforeEach
   void clearFinancialData() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
+        "TRUNCATE TABLE ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
+            + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "
+            + "ledgerx.webhook_endpoint_idempotency, ledgerx.webhook_endpoints, "
+            + "ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
             + "ledgerx.payment_idempotency, ledgerx.refunds, ledgerx.payments, "
             + "ledgerx.transfer_idempotency, ledgerx.transfers, ledgerx.ledger_entries, "
             + "ledgerx.ledger_transactions, ledgerx.ledger_accounts, ledgerx.wallet_owners");
@@ -103,6 +106,30 @@ class LedgerPostingIntegrationTest {
 
     assertThatThrownBy(() -> walletAccountService.createWalletForOwner(ownerId))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  void concurrentWalletCreationKeepsOneOwnerCurrencyAccount() throws Exception {
+    UUID ownerId = walletAccountService.createOwner(OwnerType.MERCHANT);
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Boolean> first = executor.submit(() -> attemptWalletCreation(ownerId, ready, start));
+      Future<Boolean> second = executor.submit(() -> attemptWalletCreation(ownerId, ready, start));
+      assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+      assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+          .containsExactlyInAnyOrder(true, false);
+    } finally {
+      executor.shutdownNow();
+    }
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ledgerx.ledger_accounts WHERE owner_id = ? AND currency = 'USD'",
+                Integer.class,
+                ownerId))
+        .isEqualTo(1);
   }
 
   @Test
@@ -152,6 +179,39 @@ class LedgerPostingIntegrationTest {
   }
 
   @Test
+  void databaseRejectsAndRollsBackTwoUnequalEntriesAtCommit() {
+    FundedWallet fundedWallet = fundedWallet("100.00");
+    UUID transactionId = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () ->
+                transactionTemplate.executeWithoutResult(
+                    status -> {
+                      jdbcTemplate.update(
+                          "INSERT INTO ledgerx.ledger_transactions (id, currency, description, posted_at) VALUES (?, 'USD', ?, ?)",
+                          transactionId,
+                          "Unbalanced pair",
+                          Timestamp.from(Instant.now()));
+                      jdbcTemplate.update(
+                          "INSERT INTO ledgerx.ledger_entries (id, ledger_transaction_id, line_number, ledger_account_id, side, amount, currency) VALUES (?, ?, 1, ?, 'DEBIT', 10.00, 'USD')",
+                          UUID.randomUUID(),
+                          transactionId,
+                          fundedWallet.clearingAccountId());
+                      jdbcTemplate.update(
+                          "INSERT INTO ledgerx.ledger_entries (id, ledger_transaction_id, line_number, ledger_account_id, side, amount, currency) VALUES (?, ?, 2, ?, 'CREDIT', 9.99, 'USD')",
+                          UUID.randomUUID(),
+                          transactionId,
+                          fundedWallet.walletAccountId());
+                    }))
+        .isInstanceOf(RuntimeException.class);
+
+    assertThat(countEntries(transactionId)).isZero();
+    assertThat(transactionCount()).isEqualTo(1);
+    assertThat(ledgerBalanceQueryService.balanceOf(fundedWallet.walletAccountId()).amount())
+        .isEqualByComparingTo("100.00");
+  }
+
+  @Test
   void databasePreventsMutationOfPostedJournalHistory() {
     FundedWallet fundedWallet = fundedWallet("100.00");
 
@@ -168,6 +228,18 @@ class LedgerPostingIntegrationTest {
                 Integer.class,
                 fundedWallet.walletAccountId()))
         .isEqualTo(1);
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "UPDATE ledgerx.ledger_entries SET amount = 1.00 WHERE ledger_account_id = ?",
+                    fundedWallet.walletAccountId()))
+        .isInstanceOf(DataAccessException.class);
+    assertThatThrownBy(
+            () ->
+                jdbcTemplate.update(
+                    "DELETE FROM ledgerx.ledger_entries WHERE ledger_account_id = ?",
+                    fundedWallet.walletAccountId()))
+        .isInstanceOf(DataAccessException.class);
   }
 
   @Test
@@ -250,6 +322,20 @@ class LedgerPostingIntegrationTest {
               line(fundedWallet.clearingAccountId(), EntrySide.CREDIT, amount.toPlainString())));
       return true;
     } catch (InsufficientFundsException exception) {
+      return false;
+    }
+  }
+
+  private boolean attemptWalletCreation(UUID ownerId, CountDownLatch ready, CountDownLatch start)
+      throws InterruptedException {
+    ready.countDown();
+    if (!start.await(5, TimeUnit.SECONDS)) {
+      throw new IllegalStateException("concurrent wallet creation did not start");
+    }
+    try {
+      walletAccountService.createWalletForOwner(ownerId);
+      return true;
+    } catch (DataIntegrityViolationException exception) {
       return false;
     }
   }

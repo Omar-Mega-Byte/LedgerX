@@ -4,7 +4,7 @@
 
 LedgerX is a Java 21 modular monolith with PostgreSQL as its financial source of truth. It implements active PERSON/MERCHANT wallet ownership, exact USD money, immutable balanced ledger journals, idempotent wallet transfers, payer-authorized merchant payments, merchant-authorized refunds, and a transactional outbox. PostgreSQL constraints/triggers and focused Testcontainers tests protect financial facts and derived wallet balances.
 
-Kafka propagates committed payment/refund events asynchronously; it is never the authority for money. The outbox publisher uses short leased claims and retries, so a crash may duplicate delivery but cannot silently lose a committed event. Consumers deduplicate durable local effects by event ID.
+Kafka propagates committed payment/refund events asynchronously; it is never the authority for money. The outbox publisher uses short leased claims and retries, so a crash may duplicate delivery but cannot silently lose a committed event. Consumers deduplicate durable local effects by event ID. Merchant webhook work is queued from a distinct idempotent consumer, then sent with a separate PostgreSQL lease, HMAC signature, bounded retry, and immutable attempt history. A webhook result never changes a financial fact.
 
 ## Domain boundaries
 
@@ -17,7 +17,8 @@ The current modules are:
 | Transfers | Idempotent USD wallet-to-wallet transfers |
 | Payments | PERSON-to-MERCHANT payments, compensating refunds, and derived refund state |
 | Reliability | Payment/refund idempotency records, outbox events, publisher leases, and consumer deduplication |
-| Webhooks | Signed event delivery, retries, and delivery audit history |
+| Webhooks | Merchant-owned HMAC-signed payment/refund delivery, encrypted signing secrets, leased retries, replay, and redacted delivery audit history |
+| Operations | Read-only reconciliation evidence plus bounded webhook delivery metrics and health details |
 
 These are organization boundaries, not separate deployables at this stage.
 
@@ -77,7 +78,6 @@ The following need evidence from real use cases before being fixed:
 - Redis usage and cache authority;
 - end-user application clients and onboarding flows (Keycloak is the deployed identity provider).
 - payment-provider authorization, capture, fees, settlement, chargebacks, and FX;
-- webhook delivery/replay operations and reconciliation policy;
 - event retention and dead-letter operations policy.
 
 Architecture changes that alter these assumptions should update this document and include tests for the affected failure mode.

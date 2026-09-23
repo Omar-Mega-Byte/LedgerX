@@ -60,3 +60,21 @@ ledgerx:
     batch-size: ${LEDGERX_OUTBOX_BATCH_SIZE:20}
     retry-base-delay: ${LEDGERX_OUTBOX_RETRY_BASE_DELAY:PT1S}
     retry-max-delay: ${LEDGERX_OUTBOX_RETRY_MAX_DELAY:PT5M}
+  webhooks:
+    consumer-enabled: ${LEDGERX_WEBHOOK_CONSUMER_ENABLED:false}
+    dispatcher-enabled: ${LEDGERX_WEBHOOK_DISPATCHER_ENABLED:false}
+    consumer-group: ${LEDGERX_WEBHOOK_CONSUMER_GROUP:ledgerx-webhook-delivery-enqueuer-v1}
+    encryption-key: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY:}
+    encryption-key-version: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION:1}
+    max-endpoints-per-merchant: ${LEDGERX_WEBHOOK_MAX_ENDPOINTS_PER_MERCHANT:5}
+    batch-size: ${LEDGERX_WEBHOOK_BATCH_SIZE:20}
+    poll-delay: ${LEDGERX_WEBHOOK_POLL_DELAY:PT5S}
+    lease-duration: ${LEDGERX_WEBHOOK_LEASE_DURATION:PT30S}
+    connect-timeout: ${LEDGERX_WEBHOOK_CONNECT_TIMEOUT:PT5S}
+    request-timeout: ${LEDGERX_WEBHOOK_REQUEST_TIMEOUT:PT10S}
+    retry-base-delay: ${LEDGERX_WEBHOOK_RETRY_BASE_DELAY:PT2S}
+    retry-max-delay: ${LEDGERX_WEBHOOK_RETRY_MAX_DELAY:PT5M}
+    max-attempts: ${LEDGERX_WEBHOOK_MAX_ATTEMPTS:8}
+  reconciliation:
+    enabled: ${LEDGERX_RECONCILIATION_ENABLED:false}
+    cron: ${LEDGERX_RECONCILIATION_CRON:0 15 * * * *}
