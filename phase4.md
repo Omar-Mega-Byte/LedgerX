@@ -1,6 +1,20 @@
 # Phase 4 — Signed Webhook Delivery and Operational Integrity
 
-**Status: planned.**
+**Status: implemented and verified on 2026-09-23.**
+
+## Stabilization record (2026-09-23)
+
+The Phase 4 stabilization pass added a forward-only V10 migration. Webhook delivery attempt
+numbers restart for each manual replay, so attempt history is now unique by delivery, replay
+cycle, and attempt number. Existing attempt rows receive replay cycle zero. This preserves the
+append-only audit trail and permits a replay after a terminal failure without changing its public
+event ID or payload.
+
+The dispatcher now treats a database outcome-write failure as a service failure instead of
+misclassifying it as a receiver failure and trying to write a second outcome. PostgreSQL tests
+cover receipt/delivery atomicity, duplicate and concurrent event enqueueing, immutable payloads
+and attempts, ordered replay, and production JWT ownership checks. The production Compose file
+forwards the documented webhook and reconciliation settings to LedgerX.
 
 ## 1. Goal
 
@@ -520,3 +534,22 @@ or external work diverge.
 That creates a sound basis for Phase 5 to choose selectively among rule-based risk decisions, narrowly
 scoped API keys or rate limits, richer observability/dashboarding, provider simulation, or other features
 only when a concrete use case justifies their complexity.
+
+---
+
+## Implementation and verification record
+
+Phase 4 delivers merchant-owned endpoint registration with idempotent creation, AES-GCM encrypted
+signing-secret storage, redacted reads, disablement, secret rotation, and owned manual replay. A separate
+Kafka consumer turns committed payment/refund events into one public delivery instruction per eligible
+endpoint. The dispatcher uses short PostgreSQL leases, HMAC-SHA-256 headers, no redirects, finite timeouts,
+bounded retries, terminal failures, and immutable attempt history; external delivery remains explicitly
+at least once.
+
+V8 protects endpoint, creation-idempotency, delivery, and attempt records. V9 records read-only
+reconciliation runs/findings; the runner checks ledger balance plus payment/refund outbox completeness
+under a PostgreSQL advisory transaction lock. Bounded webhook metrics and health details expose queue
+state without making a third-party receiver outage a financial or application-availability failure.
+
+On 2026-09-23, `mvnw.cmd clean verify` passed the complete unit, PostgreSQL, and Kafka Testcontainers
+suite with zero test failures, errors, or skips.

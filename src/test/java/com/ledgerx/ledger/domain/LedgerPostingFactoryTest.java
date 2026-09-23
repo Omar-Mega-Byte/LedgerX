@@ -79,6 +79,29 @@ class LedgerPostingFactoryTest {
         .hasMessage("ledger entry amount must be positive");
   }
 
+  @Test
+  void rejectsAnAmountThatCannotFitThePostgresJournalColumn() {
+    assertThatThrownBy(
+            () ->
+                factory.create(
+                    "Too large for NUMERIC(19,2)",
+                    List.of(
+                        line(UUID.randomUUID(), EntrySide.DEBIT, "100000000000000000.00"),
+                        line(UUID.randomUUID(), EntrySide.CREDIT, "100000000000000000.00"))))
+        .isInstanceOf(FinancialValidationException.class)
+        .hasMessage("ledger entry amount exceeds the supported maximum");
+
+    assertThat(
+            factory
+                .create(
+                    "Largest supported amount",
+                    List.of(
+                        line(UUID.randomUUID(), EntrySide.DEBIT, "99999999999999999.99"),
+                        line(UUID.randomUUID(), EntrySide.CREDIT, "99999999999999999.99")))
+                .entries())
+        .hasSize(2);
+  }
+
   private PostingLine line(UUID accountId, EntrySide side, String amount) {
     return new PostingLine(accountId, side, new Money(new BigDecimal(amount), CurrencyCode.USD));
   }

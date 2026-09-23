@@ -1,6 +1,7 @@
 package com.ledgerx.reliability;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import com.ledgerx.access.OwnerContext;
 import com.ledgerx.ledger.application.LedgerPostingService;
@@ -15,11 +16,13 @@ import com.ledgerx.payment.domain.PaymentCommand;
 import com.ledgerx.wallet.application.WalletAccountService;
 import com.ledgerx.wallet.application.WalletRegistration;
 import com.ledgerx.wallet.domain.OwnerType;
+import com.ledgerx.webhook.WebhookEndpointApplicationService;
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -32,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -45,10 +49,13 @@ import org.testcontainers.utility.DockerImageName;
     properties = {
       "ledgerx.outbox.publisher-enabled=true",
       "ledgerx.kafka.consumer-enabled=true",
+      "ledgerx.webhooks.consumer-enabled=true",
+      "ledgerx.webhooks.dispatcher-enabled=false",
       "ledgerx.outbox.poll-delay=PT1H"
     })
 @ActiveProfiles("test")
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class KafkaOutboxIntegrationTest {
 
   @Container
@@ -65,6 +72,7 @@ class KafkaOutboxIntegrationTest {
   @Autowired private WalletAccountService walletAccountService;
   @Autowired private LedgerPostingService ledgerPostingService;
   @Autowired private PaymentApplicationService paymentApplicationService;
+  @Autowired private WebhookEndpointApplicationService webhookEndpointService;
   @Autowired private OutboxPublisher outboxPublisher;
   @Autowired private KafkaTemplate<String, String> kafkaTemplate;
   @Autowired private JdbcTemplate jdbcTemplate;
@@ -75,12 +83,20 @@ class KafkaOutboxIntegrationTest {
     registry.add("spring.datasource.username", POSTGRES::getUsername);
     registry.add("spring.datasource.password", POSTGRES::getPassword);
     registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+    registry.add(
+        "ledgerx.webhooks.encryption-key", () -> Base64.getEncoder().encodeToString(new byte[32]));
   }
 
   @Test
   void publishesCommittedPaymentEventsAndDeduplicatesKafkaRedelivery() throws Exception {
     FundedWallet payer = fundedWallet(OwnerType.PERSON, "100.00");
     WalletRegistration merchant = walletAccountService.createWallet(OwnerType.MERCHANT);
+    webhookEndpointService.create(
+        new OwnerContext(merchant.ownerId()),
+        "https://merchant.example.com/hooks",
+        Set.of("payment.completed.v1"),
+        "merchant-signing-secret-0123456789",
+        "kafka-webhook-registration");
     PaymentExecution payment =
         paymentApplicationService.create(
             new OwnerContext(payer.ownerId()),
@@ -88,7 +104,7 @@ class KafkaOutboxIntegrationTest {
                 payer.walletId(), merchant.walletAccountId(), money("25.00"), "kafka-payment"));
 
     outboxPublisher.publishAvailable();
-    awaitProcessedEvent(payment.payment().id(), 1);
+    awaitProcessedEvent(payment.payment().id(), 2);
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT status FROM ledgerx.outbox_events WHERE aggregate_id = ?",
@@ -106,62 +122,61 @@ class KafkaOutboxIntegrationTest {
             .send("ledgerx.payment-events.v1", payment.payment().id().toString(), payload)
             .get(5, TimeUnit.SECONDS)
             .getRecordMetadata();
-    awaitConsumerOffsetPast(duplicateMetadata);
+    awaitConsumerOffsetPast(duplicateMetadata, "ledgerx-payment-event-audit-v1");
+    awaitConsumerOffsetPast(duplicateMetadata, "ledgerx-webhook-delivery-enqueuer-v1");
     assertThat(
             jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ledgerx.processed_events WHERE aggregate_id = ?",
                 Integer.class,
                 payment.payment().id()))
-        .isEqualTo(1);
-  }
-
-  private void awaitProcessedEvent(UUID paymentId, int expectedCount) throws InterruptedException {
-    Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
-    while (Instant.now().isBefore(deadline)) {
-      Integer count =
-          jdbcTemplate.queryForObject(
-              "SELECT COUNT(*) FROM ledgerx.processed_events WHERE aggregate_id = ?",
-              Integer.class,
-              paymentId);
-      if (count != null && count == expectedCount) {
-        return;
-      }
-      Thread.sleep(100);
-    }
+        .isEqualTo(2);
     assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ledgerx.processed_events WHERE aggregate_id = ?",
+                "SELECT COUNT(*) FROM ledgerx.webhook_deliveries WHERE aggregate_id = ?",
                 Integer.class,
-                paymentId))
-        .isEqualTo(expectedCount);
+                payment.payment().id()))
+        .isEqualTo(1);
+    String publicPayload =
+        jdbcTemplate.queryForObject(
+            "SELECT payload FROM ledgerx.webhook_deliveries WHERE aggregate_id = ?",
+            String.class,
+            payment.payment().id());
+    assertThat(publicPayload)
+        .contains(payment.payment().id().toString())
+        .doesNotContain("payerWalletId", "merchantWalletId", "ledgerTransactionId");
   }
 
-  private void awaitConsumerOffsetPast(RecordMetadata metadata) throws Exception {
-    Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
+  private void awaitProcessedEvent(UUID paymentId, int expectedCount) {
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM ledgerx.processed_events WHERE aggregate_id = ?",
+                            Integer.class,
+                            paymentId))
+                    .isEqualTo(expectedCount));
+  }
+
+  private void awaitConsumerOffsetPast(RecordMetadata metadata, String groupId) throws Exception {
     TopicPartition partition = new TopicPartition(metadata.topic(), metadata.partition());
     try (AdminClient adminClient =
         AdminClient.create(
             Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers()))) {
-      while (Instant.now().isBefore(deadline)) {
-        OffsetAndMetadata committedOffset =
-            adminClient
-                .listConsumerGroupOffsets("ledgerx-payment-event-audit-v1")
-                .partitionsToOffsetAndMetadata()
-                .get(5, TimeUnit.SECONDS)
-                .get(partition);
-        if (committedOffset != null && committedOffset.offset() > metadata.offset()) {
-          return;
-        }
-        Thread.sleep(100);
-      }
-      OffsetAndMetadata committedOffset =
-          adminClient
-              .listConsumerGroupOffsets("ledgerx-payment-event-audit-v1")
-              .partitionsToOffsetAndMetadata()
-              .get(5, TimeUnit.SECONDS)
-              .get(partition);
-      assertThat(committedOffset).isNotNull();
-      assertThat(committedOffset.offset()).isGreaterThan(metadata.offset());
+      await()
+          .atMost(Duration.ofSeconds(10))
+          .untilAsserted(
+              () -> {
+                OffsetAndMetadata committedOffset =
+                    adminClient
+                        .listConsumerGroupOffsets(groupId)
+                        .partitionsToOffsetAndMetadata()
+                        .get(5, TimeUnit.SECONDS)
+                        .get(partition);
+                assertThat(committedOffset).isNotNull();
+                assertThat(committedOffset.offset()).isGreaterThan(metadata.offset());
+              });
     }
   }
 

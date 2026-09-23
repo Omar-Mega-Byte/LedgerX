@@ -84,7 +84,10 @@ class TransferApiIntegrationTest {
   @BeforeEach
   void clearFinancialData() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
+        "TRUNCATE TABLE ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
+            + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "
+            + "ledgerx.webhook_endpoint_idempotency, ledgerx.webhook_endpoints, "
+            + "ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
             + "ledgerx.payment_idempotency, ledgerx.refunds, ledgerx.payments, "
             + "ledgerx.transfer_idempotency, ledgerx.transfers, ledgerx.ledger_entries, "
             + "ledgerx.ledger_transactions, ledgerx.ledger_accounts, ledgerx.wallet_owners");
@@ -133,6 +136,36 @@ class TransferApiIntegrationTest {
                 String.class,
                 "create-transfer"))
         .isEqualTo("COMPLETED");
+  }
+
+  @Test
+  void transfersTheSmallestExactBalanceAcrossEveryOwnerTypePair() throws Exception {
+    int transferNumber = 0;
+    for (OwnerType sourceType : OwnerType.values()) {
+      for (OwnerType destinationType : OwnerType.values()) {
+        FundedWallet source = fundedWallet(sourceType, "0.01");
+        WalletRegistration destination = walletAccountService.createWallet(destinationType);
+        postTransfer(
+                source.ownerId(),
+                "owner-pair-" + transferNumber++,
+                source.walletId(),
+                destination.walletAccountId(),
+                "0.01")
+            .andExpect(status().isCreated());
+        assertThat(ledgerBalanceQueryService.balanceOf(source.walletId()).amount())
+            .isEqualByComparingTo("0.00");
+        assertThat(ledgerBalanceQueryService.balanceOf(destination.walletAccountId()).amount())
+            .isEqualByComparingTo("0.01");
+      }
+    }
+
+    assertThat(count("SELECT COUNT(*) FROM ledgerx.transfers")).isEqualTo(4);
+    assertThat(count("SELECT COUNT(*) FROM ledgerx.ledger_transactions")).isEqualTo(8);
+    assertThat(count("SELECT COUNT(*) FROM ledgerx.ledger_entries")).isEqualTo(16);
+    assertThat(
+            count(
+                "SELECT COUNT(*) FROM (SELECT ledger_transaction_id FROM ledgerx.ledger_entries GROUP BY ledger_transaction_id HAVING SUM(CASE WHEN side = 'DEBIT' THEN amount ELSE -amount END) <> 0) AS unbalanced"))
+        .isZero();
   }
 
   @Test
@@ -318,6 +351,40 @@ class TransferApiIntegrationTest {
     postTransfer(source.ownerId(), "same-wallet", source.walletId(), source.walletId(), "1.00")
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.code").value("TRANSFER_NOT_PROCESSABLE"));
+    postTransfer(
+            source.ownerId(),
+            "negative-amount",
+            source.walletId(),
+            destination.walletAccountId(),
+            "-1.00")
+        .andExpect(status().isUnprocessableEntity());
+    postTransfer(
+            source.ownerId(),
+            "excessive-scale",
+            source.walletId(),
+            destination.walletAccountId(),
+            "0.001")
+        .andExpect(status().isUnprocessableEntity());
+    postTransfer(
+            source.ownerId(),
+            "malformed-amount",
+            source.walletId(),
+            destination.walletAccountId(),
+            "not-a-number")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+    postTransfer(
+            source.ownerId(),
+            "database-overflow",
+            source.walletId(),
+            destination.walletAccountId(),
+            "100000000000000000.00")
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("TRANSFER_NOT_PROCESSABLE"));
+    assertThat(count("SELECT COUNT(*) FROM ledgerx.transfers")).isZero();
+    assertThat(count("SELECT COUNT(*) FROM ledgerx.transfer_idempotency")).isZero();
+    assertThat(ledgerBalanceQueryService.balanceOf(source.walletId()).amount())
+        .isEqualByComparingTo("100.00");
   }
 
   @Test
