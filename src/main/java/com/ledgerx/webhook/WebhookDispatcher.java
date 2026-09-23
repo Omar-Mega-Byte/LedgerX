@@ -57,13 +57,21 @@ public class WebhookDispatcher {
 
     WebhookClaim claim = claimed.get();
     Instant startedAt = clock.instant();
+    WebhookDelivery delivery = claim.delivery();
+    long timestamp = startedAt.getEpochSecond();
+    String signature;
     try {
-      WebhookDelivery delivery = claim.delivery();
-      long timestamp = startedAt.getEpochSecond();
-      String signature =
+      signature =
           WebhookSignature.sign(
               secretCipher.decrypt(claim.secretCiphertext()), timestamp, delivery.payload());
-      WebhookHttpResponse response =
+    } catch (RuntimeException exception) {
+      completeFailure(claim, startedAt, clock.instant(), null, "SIGNING_FAILURE");
+      return true;
+    }
+
+    WebhookHttpResponse response;
+    try {
+      response =
           httpClient.post(
               claim.targetUrl(),
               delivery.eventId().toString(),
@@ -72,12 +80,11 @@ public class WebhookDispatcher {
               timestamp,
               signature,
               delivery.payload());
-      completeResponse(claim, startedAt, clock.instant(), response);
     } catch (WebhookTransportException exception) {
       completeFailure(claim, startedAt, clock.instant(), null, exception.category());
-    } catch (RuntimeException exception) {
-      completeFailure(claim, startedAt, clock.instant(), null, "SIGNING_FAILURE");
+      return true;
     }
+    completeResponse(claim, startedAt, clock.instant(), response);
     return true;
   }
 

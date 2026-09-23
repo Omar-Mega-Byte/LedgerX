@@ -1,8 +1,10 @@
 package com.ledgerx.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +60,70 @@ class WebhookDispatcherTest {
             signature.capture(),
             eq(claim.delivery().payload()));
     assertThat(signature.getValue()).startsWith("v1=");
+  }
+
+  @Test
+  void doesNotMistakeAStorageFailureForAReceiverFailure() {
+    WebhookDeliveryStore deliveryStore = Mockito.mock(WebhookDeliveryStore.class);
+    WebhookSecretCipher secretCipher = Mockito.mock(WebhookSecretCipher.class);
+    WebhookHttpClient httpClient = Mockito.mock(WebhookHttpClient.class);
+    WebhookMetrics webhookMetrics = Mockito.mock(WebhookMetrics.class);
+    WebhookClaim claim = claim();
+    when(deliveryStore.claimNext(eq(NOW), any(Duration.class))).thenReturn(Optional.of(claim));
+    when(secretCipher.decrypt(claim.secretCiphertext()))
+        .thenReturn("merchant-secret-0123456789-abcdef");
+    when(httpClient.post(any(), any(), any(), any(), any(Long.class), any(), any()))
+        .thenReturn(new WebhookHttpResponse(204, null));
+    Mockito.doThrow(new IllegalStateException("database write failed"))
+        .when(deliveryStore)
+        .markDelivered(claim, NOW, NOW, 204);
+
+    WebhookDispatcher dispatcher =
+        new WebhookDispatcher(
+            deliveryStore,
+            secretCipher,
+            httpClient,
+            properties(),
+            webhookMetrics,
+            Clock.fixed(NOW, ZoneOffset.UTC));
+
+    assertThatThrownBy(dispatcher::dispatchNext)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("database write failed");
+    verify(deliveryStore, never()).scheduleRetry(any(), any(), any(), any(), any(), any());
+    verify(deliveryStore, never()).markDead(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void retriesRateLimitingWithBoundedReceiverDelayAndEndsClientErrors() {
+    WebhookDeliveryStore deliveryStore = Mockito.mock(WebhookDeliveryStore.class);
+    WebhookSecretCipher secretCipher = Mockito.mock(WebhookSecretCipher.class);
+    WebhookHttpClient httpClient = Mockito.mock(WebhookHttpClient.class);
+    WebhookMetrics webhookMetrics = Mockito.mock(WebhookMetrics.class);
+    WebhookClaim claim = claim();
+    when(deliveryStore.claimNext(eq(NOW), any(Duration.class)))
+        .thenReturn(Optional.of(claim))
+        .thenReturn(Optional.of(claim));
+    when(secretCipher.decrypt(claim.secretCiphertext()))
+        .thenReturn("merchant-secret-0123456789-abcdef");
+    when(httpClient.post(any(), any(), any(), any(), any(Long.class), any(), any()))
+        .thenReturn(
+            new WebhookHttpResponse(429, Duration.ofMinutes(20)),
+            new WebhookHttpResponse(400, null));
+    WebhookDispatcher dispatcher =
+        new WebhookDispatcher(
+            deliveryStore,
+            secretCipher,
+            httpClient,
+            properties(),
+            webhookMetrics,
+            Clock.fixed(NOW, ZoneOffset.UTC));
+
+    assertThat(dispatcher.dispatchNext()).isTrue();
+    verify(deliveryStore)
+        .scheduleRetry(claim, NOW, NOW, 429, "HTTP_429", NOW.plus(Duration.ofMinutes(5)));
+    assertThat(dispatcher.dispatchNext()).isTrue();
+    verify(deliveryStore).markDead(claim, NOW, NOW, 400, "HTTP_400");
   }
 
   private WebhookProperties properties() {
