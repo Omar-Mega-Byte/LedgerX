@@ -6,7 +6,6 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -83,16 +82,12 @@ public class PaymentRiskService {
             SELECT COUNT(*) AS payment_count, COALESCE(SUM(p.amount), 0) AS payment_total
             FROM ledgerx.payments p
             JOIN ledgerx.ledger_accounts wallet ON wallet.id = p.payer_wallet_account_id
-            WHERE wallet.owner_id = ? AND p.completed_at >= ? AND p.completed_at < ?
+            WHERE wallet.owner_id = ? AND p.completed_at >= ? AND p.completed_at <= ?
             """,
             (rs, row) -> new Window(rs.getInt("payment_count"), rs.getBigDecimal("payment_total")),
             payerOwnerId,
             Timestamp.from(now.minus(Duration.ofHours(24))),
             Timestamp.from(now));
-    List<String> rules = new ArrayList<>();
-    if (money.amount().compareTo(policy.maxPaymentAmount()) > 0) {
-      rules.add("MAX_PAYMENT_AMOUNT");
-    }
     int openCases =
         jdbc.queryForObject(
             """
@@ -104,26 +99,22 @@ public class PaymentRiskService {
             Integer.class,
             payerOwnerId,
             Timestamp.from(now));
-    if (openCases >= MAX_OPEN_CASES && !approvedReview) {
-      rules.add("OPEN_CASE_LIMIT");
-    }
-    if (!rules.isEmpty()) {
-      return new Decision(
-          policy.id(), true, "BLOCK", String.join(",", rules), window.count(), window.total());
-    }
-    if (!approvedReview) {
-      if ((long) window.count() + 1 > policy.reviewPaymentCount()) {
-        rules.add("PAYMENT_COUNT_24H");
-      }
-      if (window.total().add(money.amount()).compareTo(policy.reviewPaymentTotal()) > 0) {
-        rules.add("PAYMENT_TOTAL_24H");
-      }
-    }
+    RiskRuleEvaluator.Evaluation evaluation =
+        RiskRuleEvaluator.evaluate(
+            money.amount(),
+            policy.maxPaymentAmount(),
+            window.count(),
+            window.total(),
+            policy.reviewPaymentCount(),
+            policy.reviewPaymentTotal(),
+            openCases,
+            MAX_OPEN_CASES,
+            approvedReview);
     return new Decision(
         policy.id(),
         true,
-        rules.isEmpty() ? "ALLOW" : "REVIEW",
-        String.join(",", rules),
+        evaluation.outcome(),
+        evaluation.ruleCodes(),
         window.count(),
         window.total());
   }

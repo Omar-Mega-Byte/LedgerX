@@ -45,7 +45,7 @@ The current `payment_idempotency` schema permits only `PROCESSING -> COMPLETED`,
 | Rule | Input | Outcome when exceeded | Why |
 |---|---|---|---|
 | Maximum single payment | Requested USD amount | `BLOCK` | A simple hard ceiling prevents an unusually large new payment. |
-| Rolling completed payment count | Payer's completed payments in `[now - 24h, now)` | `REVIEW` | Shows velocity checks without an external scoring system. |
+| Rolling completed payment count | Payer's completed payments in `[now - 24h, now]` | `REVIEW` | Shows velocity checks without an external scoring system. |
 | Rolling completed payment total | Sum of those payments plus requested amount | `REVIEW` | Limits sudden increases in committed spending. |
 
 An operator creates an immutable policy version and activates it atomically. Exactly one version is active. Store the actor, activation time, thresholds, and a short change reason. Start with a documented permissive policy and an explicit enablement setting so rollout cannot unexpectedly block existing users. A policy edit creates a new version; past assessments keep the original version ID and rule codes.
