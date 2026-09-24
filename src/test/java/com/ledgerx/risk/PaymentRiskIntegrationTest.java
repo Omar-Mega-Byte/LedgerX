@@ -23,6 +23,9 @@ import com.ledgerx.wallet.application.WalletAccountService;
 import com.ledgerx.wallet.application.WalletRegistration;
 import com.ledgerx.wallet.domain.OwnerType;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -30,11 +33,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -52,6 +59,8 @@ import org.testcontainers.utility.DockerImageName;
 @ActiveProfiles("test")
 @Testcontainers
 class PaymentRiskIntegrationTest {
+
+  private static final MutableClock TEST_CLOCK = new MutableClock();
 
   @Container
   static final PostgreSQLContainer<?> POSTGRES =
@@ -77,6 +86,7 @@ class PaymentRiskIntegrationTest {
 
   @BeforeEach
   void reset() {
+    TEST_CLOCK.set(Instant.now());
     jdbc.execute(
         "TRUNCATE TABLE ledgerx.risk_review_actions, ledgerx.risk_review_cases, "
             + "ledgerx.risk_assessments, ledgerx.demo_fundings, "
@@ -174,6 +184,21 @@ class PaymentRiskIntegrationTest {
   }
 
   @Test
+  void ledgerFailureRollsBackRiskAndIdempotencyEvidence() throws Exception {
+    activate("1000.00", 10, "1000.00");
+    WalletRegistration payer = fundedPayer();
+    WalletRegistration merchant = wallets.createWallet(OwnerType.MERCHANT);
+
+    postPayment(payer, merchant, "insufficient-risk-key", "200.00")
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("PAYMENT_NOT_PROCESSABLE"));
+
+    assertNoPaymentEffect();
+    assertThat(count("SELECT COUNT(*) FROM ledgerx.risk_assessments")).isZero();
+    assertThat(count("SELECT COUNT(*) FROM ledgerx.payment_idempotency")).isZero();
+  }
+
+  @Test
   void reviewKeyCannotBeReusedForDifferentPayment() throws Exception {
     activate("100.00", 10, "10.00");
     WalletRegistration payer = fundedPayer();
@@ -205,6 +230,49 @@ class PaymentRiskIntegrationTest {
         .andExpect(jsonPath("$.code").value("RISK_REVIEW_CLOSED"));
     assertThat(count("SELECT COUNT(*) FROM ledgerx.risk_review_actions WHERE case_id = ?", caseId))
         .isEqualTo(1);
+    assertNoPaymentEffect();
+  }
+
+  @Test
+  void openReviewExpiresWithoutPosting() throws Exception {
+    activate("100.00", 10, "10.00");
+    WalletRegistration payer = fundedPayer();
+    WalletRegistration merchant = wallets.createWallet(OwnerType.MERCHANT);
+    MvcResult pending =
+        postPayment(payer, merchant, "open-expiry-key", "20.00")
+            .andExpect(status().isAccepted())
+            .andReturn();
+    UUID caseId = UUID.fromString(body(pending).get("caseId").asText());
+
+    TEST_CLOCK.set(TEST_CLOCK.instant().plusSeconds(8 * 24 * 60 * 60));
+    risk.expireCases();
+
+    assertThat(risk.caseForOwner(caseId, payer.ownerId()).status()).isEqualTo("EXPIRED");
+    postPayment(payer, merchant, "open-expiry-key", "20.00")
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("RISK_REVIEW_CLOSED"));
+    assertNoPaymentEffect();
+  }
+
+  @Test
+  void approvalExpiresWithoutPosting() throws Exception {
+    activate("100.00", 10, "10.00");
+    WalletRegistration payer = fundedPayer();
+    WalletRegistration merchant = wallets.createWallet(OwnerType.MERCHANT);
+    MvcResult pending =
+        postPayment(payer, merchant, "approval-expiry-key", "20.00")
+            .andExpect(status().isAccepted())
+            .andReturn();
+    UUID caseId = UUID.fromString(body(pending).get("caseId").asText());
+    risk.decide(caseId, "APPROVE", "approve for expiry test", "operator-subject");
+
+    TEST_CLOCK.set(TEST_CLOCK.instant().plusSeconds(25 * 60 * 60));
+    risk.expireCases();
+
+    assertThat(risk.caseForOwner(caseId, payer.ownerId()).status()).isEqualTo("EXPIRED");
+    postPayment(payer, merchant, "approval-expiry-key", "20.00")
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("RISK_REVIEW_CLOSED"));
     assertNoPaymentEffect();
   }
 
@@ -360,5 +428,37 @@ class PaymentRiskIntegrationTest {
 
   private JsonNode body(MvcResult result) throws Exception {
     return objectMapper.readTree(result.getResponse().getContentAsString());
+  }
+
+  @TestConfiguration
+  static class RiskClockConfiguration {
+    @Bean
+    @Primary
+    Clock riskTestClock() {
+      return TEST_CLOCK;
+    }
+  }
+
+  private static final class MutableClock extends Clock {
+    private final AtomicReference<Instant> current = new AtomicReference<>(Instant.now());
+
+    void set(Instant instant) {
+      current.set(instant);
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return ZoneId.of("UTC");
+    }
+
+    @Override
+    public Clock withZone(ZoneId zone) {
+      return Clock.fixed(instant(), zone);
+    }
+
+    @Override
+    public Instant instant() {
+      return current.get();
+    }
   }
 }

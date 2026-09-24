@@ -23,12 +23,25 @@ public class RiskMetrics {
     for (String outcome : new String[] {"ALLOW", "REVIEW", "BLOCK"}) {
       registry.counter("ledgerx.risk.decisions", "outcome", outcome);
     }
+    registry.counter("ledgerx.risk.evaluation.errors");
+    registry.counter("ledgerx.risk.expired.cases", "previous_status", "OPEN");
+    registry.counter("ledgerx.risk.expired.cases", "previous_status", "APPROVED");
     Gauge.builder("ledgerx.risk.open_cases", this, RiskMetrics::openCases).register(registry);
     Gauge.builder("ledgerx.risk.aged_cases", this, RiskMetrics::agedCases).register(registry);
   }
 
   public void decided(String outcome) {
     registry.counter("ledgerx.risk.decisions", "outcome", outcome).increment();
+  }
+
+  public void evaluationError() {
+    registry.counter("ledgerx.risk.evaluation.errors").increment();
+  }
+
+  public void expired(String previousStatus, int count) {
+    registry
+        .counter("ledgerx.risk.expired.cases", "previous_status", previousStatus)
+        .increment(count);
   }
 
   private double openCases() {
