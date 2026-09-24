@@ -87,7 +87,7 @@ class PaymentApiIntegrationTest {
   @BeforeEach
   void clearFinancialData() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
+        "TRUNCATE TABLE ledgerx.risk_review_actions, ledgerx.risk_review_cases, ledgerx.risk_assessments, ledgerx.demo_fundings, ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
             + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "
             + "ledgerx.webhook_endpoint_idempotency, ledgerx.webhook_endpoints, "
             + "ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
@@ -182,9 +182,24 @@ class PaymentApiIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn());
 
-    postRefund(merchant.ownerId(), "refund-one", paymentId, "20.00")
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.money.amount").value("20.00"));
+    MvcResult firstRefund =
+        postRefund(merchant.ownerId(), "refund-one", paymentId, "20.00")
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.money.amount").value("20.00"))
+            .andReturn();
+    UUID refundId = UUID.fromString(body(firstRefund).get("refundId").asText());
+    mockMvc
+        .perform(
+            get("/api/v1/payments/{paymentId}/refunds", paymentId)
+                .header("X-LedgerX-Owner-Id", payer.ownerId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].refundId").value(refundId.toString()));
+    mockMvc
+        .perform(
+            get("/api/v1/refunds/{refundId}", refundId)
+                .header("X-LedgerX-Owner-Id", merchant.ownerId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paymentId").value(paymentId.toString()));
     mockMvc
         .perform(
             get("/api/v1/payments/{paymentId}", paymentId)

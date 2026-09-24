@@ -1,0 +1,11 @@
+{
+  "name": "ledgerx-workbench",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "check:ui": "tsc --project jsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

@@ -6,6 +6,30 @@ LedgerX is a production-inspired Java backend for payment and digital-wallet wor
 > journals, idempotent transfers, merchant payments/refunds, transactional outbox/Kafka delivery,
 > and merchant-owned signed webhook delivery with retries, replay, and reconciliation evidence.
 > Production deployment uses Keycloak-signed JWTs and Caddy HTTPS.
+> Phase 5 payment risk controls are in implementation and await PostgreSQL integration verification.
+
+## Workbench
+
+LedgerX includes a same-origin, responsive browser workbench at `/`. Its contextual wallet,
+activity, payment, webhook, and operator views use the REST API. The UI ships as static assets
+inside the Spring Boot jar; it needs no separate frontend server. In local mode, enter a prepared
+owner UUID using the development-only identity seam. In production, the workbench signs in through
+Keycloak Authorization Code with PKCE.
+
+The API includes owner-scoped wallet balances, paged activity, refund lookup, and immutable journal
+evidence. Privileged provisioning and reconciliation views require the `ledgerx-operator` realm
+role. The Phase 5 workbench adds payer review status and an operator risk queue. Local development offers an idempotent demo top-up backed by a balanced journal entry;
+production does not expose that endpoint. The workbench cannot repair ledger entries. See
+[production deployment](docs/production-deployment.md) for browser client setup.
+
+Payment risk starts with a disabled policy. An operator can activate versioned USD amount and
+24-hour velocity rules. `ALLOW` completes through the existing ledger/outbox flow; `REVIEW` and
+`BLOCK` create durable decisions without moving money. An operator approval only permits the
+original payer to retry the exact request and idempotency key. See [Phase 5](Phase5.md) for the
+contract and verification criteria.
+
+The UI uses dependency-free browser modules with JSDoc type checks. Run `npm ci` and
+`npm run check:ui` to check browser code; Maven packages the static files directly.
 
 ## Why LedgerX
 

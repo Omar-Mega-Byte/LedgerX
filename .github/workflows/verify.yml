@@ -17,5 +17,11 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Check workbench types
+        run: npm ci && npm run check:ui
       - name: Verify
         run: bash ./mvnw --batch-mode verify

@@ -138,6 +138,13 @@ public class WebhookEndpointApplicationService {
     return delivery;
   }
 
+  @Transactional(readOnly = true)
+  public List<WebhookDeliveryAttempt> listAttempts(
+      OwnerContext ownerContext, UUID endpointId, UUID deliveryId, int limit, int page) {
+    findDelivery(ownerContext, endpointId, deliveryId);
+    return deliveryStore.findAttempts(deliveryId, limit, page * limit);
+  }
+
   @Transactional
   public void replay(OwnerContext ownerContext, UUID endpointId, UUID deliveryId) {
     requireActiveMerchantForWrite(ownerContext.ownerId());

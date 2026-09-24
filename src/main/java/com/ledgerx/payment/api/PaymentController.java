@@ -12,8 +12,11 @@ import com.ledgerx.payment.application.PaymentQueryService;
 import com.ledgerx.payment.application.RefundApplicationService;
 import com.ledgerx.payment.application.RefundExecution;
 import com.ledgerx.payment.domain.PaymentCommand;
+import com.ledgerx.payment.domain.PaymentNotFoundException;
 import com.ledgerx.payment.domain.PaymentValidationException;
 import com.ledgerx.payment.domain.RefundCommand;
+import com.ledgerx.payment.persistence.RefundRepository;
+import com.ledgerx.risk.api.RiskResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -28,6 +31,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -57,16 +61,19 @@ public class PaymentController {
   private final PaymentApplicationService paymentApplicationService;
   private final RefundApplicationService refundApplicationService;
   private final PaymentQueryService paymentQueryService;
+  private final RefundRepository refundRepository;
   private final OwnerContextResolver ownerContextResolver;
 
   public PaymentController(
       PaymentApplicationService paymentApplicationService,
       RefundApplicationService refundApplicationService,
       PaymentQueryService paymentQueryService,
+      RefundRepository refundRepository,
       OwnerContextResolver ownerContextResolver) {
     this.paymentApplicationService = paymentApplicationService;
     this.refundApplicationService = refundApplicationService;
     this.paymentQueryService = paymentQueryService;
+    this.refundRepository = refundRepository;
     this.ownerContextResolver = ownerContextResolver;
   }
 
@@ -77,14 +84,18 @@ public class PaymentController {
       description =
           """
           Debits a PERSON payer wallet and credits a MERCHANT wallet through one balanced immutable
-          journal. The supplied development owner must own the payer wallet. It is forgeable and
-          not authentication; do not expose this endpoint publicly until a real principal replaces it.
+          journal. The caller must own the payer wallet. Production requires a signed Keycloak JWT;
+          the development owner header is available only outside the production profile.
 
-          Repeating the same owner, Idempotency-Key, and canonical request returns the completed
-          payment without another financial effect. Use active USD wallets prepared through the
-          internal development setup; public onboarding and deposit APIs remain out of scope.
+          Repeating the same owner, Idempotency-Key, and canonical request replays its durable
+          outcome. An enabled risk policy may return REVIEW or BLOCK without moving money. Only the
+          original payer can complete an approved REVIEW with the same request and key.
           """)
   @ApiResponses({
+    @ApiResponse(
+        responseCode = "202",
+        description = "Risk review is required; no money has moved.",
+        content = @Content(schema = @Schema(implementation = RiskResponse.class))),
     @ApiResponse(
         responseCode = "201",
         description =
@@ -112,12 +123,13 @@ public class PaymentController {
         content = @Content(schema = @Schema(implementation = ApiError.class))),
     @ApiResponse(
         responseCode = "422",
-        content = @Content(schema = @Schema(implementation = ApiError.class))),
+        description = "Financial validation error or a durable blocked/closed risk result.",
+        content = @Content(schema = @Schema(oneOf = {ApiError.class, RiskResponse.class}))),
     @ApiResponse(
         responseCode = "500",
         content = @Content(schema = @Schema(implementation = ApiError.class)))
   })
-  public ResponseEntity<PaymentResponse> create(
+  public ResponseEntity<?> create(
       @Parameter(
               name = OWNER_HEADER,
               in = ParameterIn.HEADER,
@@ -167,6 +179,18 @@ public class PaymentController {
                 request.merchantWalletId(),
                 toMoney(request.money()),
                 idempotencyKey));
+    if (execution.risk() != null) {
+      RiskResponse risk = RiskResponse.from(execution.risk());
+      if (risk.outcome().equals("BLOCK")
+          || risk.caseStatus().equals("DECLINED")
+          || risk.caseStatus().equals("EXPIRED")
+          || risk.caseStatus().equals("POLICY_BLOCKED")) {
+        return ResponseEntity.unprocessableEntity().body(risk);
+      }
+      return ResponseEntity.accepted()
+          .location(URI.create("/api/v1/payment-risk-cases/" + risk.caseId()))
+          .body(risk);
+    }
     PaymentResponse response =
         PaymentResponse.from(
             paymentQueryService.findForOwner(execution.payment().id(), ownerContext));
@@ -286,6 +310,32 @@ public class PaymentController {
     return ResponseEntity.created(
             URI.create("/api/v1/payments/" + paymentId + "/refunds/" + response.refundId()))
         .body(response);
+  }
+
+  @GetMapping("/{paymentId}/refunds")
+  public List<RefundResponse> listRefunds(
+      @RequestHeader(value = OWNER_HEADER, required = false) String ownerHeader,
+      @AuthenticationPrincipal Jwt authenticatedToken,
+      @PathVariable UUID paymentId) {
+    paymentQueryService.findForOwner(
+        paymentId, ownerContextResolver.resolve(ownerHeader, authenticatedToken));
+    return refundRepository.findAllByPaymentIdOrderByCompletedAtAsc(paymentId).stream()
+        .map(RefundResponse::from)
+        .toList();
+  }
+
+  @GetMapping("/{paymentId}/refunds/{refundId}")
+  public RefundResponse findRefund(
+      @RequestHeader(value = OWNER_HEADER, required = false) String ownerHeader,
+      @AuthenticationPrincipal Jwt authenticatedToken,
+      @PathVariable UUID paymentId,
+      @PathVariable UUID refundId) {
+    paymentQueryService.findForOwner(
+        paymentId, ownerContextResolver.resolve(ownerHeader, authenticatedToken));
+    return RefundResponse.from(
+        refundRepository
+            .findByIdAndPaymentId(refundId, paymentId)
+            .orElseThrow(() -> new PaymentNotFoundException("refund was not found")));
   }
 
   private Money toMoney(MoneyRequest request) {

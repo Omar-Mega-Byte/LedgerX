@@ -16,9 +16,18 @@ The current modules are:
 | Wallet and ledger | Accounts, derived balances, immutable ledger transactions, and entries |
 | Transfers | Idempotent USD wallet-to-wallet transfers |
 | Payments | PERSON-to-MERCHANT payments, compensating refunds, and derived refund state |
+| Payment risk | Versioned operator policy, durable payment assessments, bounded review cases, and payer-only approved retries; disabled by default |
 | Reliability | Payment/refund idempotency records, outbox events, publisher leases, and consumer deduplication |
 | Webhooks | Merchant-owned HMAC-signed payment/refund delivery, encrypted signing secrets, leased retries, replay, and redacted delivery audit history |
 | Operations | Read-only reconciliation evidence plus bounded webhook delivery metrics and health details |
+
+Phase 5 risk checks run in the payment transaction before ledger posting. Enabled policies use
+a payer-scoped PostgreSQL advisory transaction lock to serialize rolling-window decisions; this
+does not reverse the ledger's account-then-owner row-lock order. An allowed payment, assessment,
+journal, idempotency completion, and outbox event commit together. Review and block outcomes
+persist with no payment, journal, or event. Operator approval records an action but cannot
+create a payment; the original payer must retry the same command and key. The initial policy is
+disabled so deployments retain Phase 4 behavior until an operator activates rules.
 
 These are organization boundaries, not separate deployables at this stage.
 

@@ -66,7 +66,14 @@ docker-compose.local.yaml
 
 # Local tooling metadata
 .serena/
-.codex/
+.codex/*
+!.codex/skills/
+.codex/skills/*
+!.codex/skills/graphify/
 
 # Generated Graphify knowledge graph
 graphify-out/
+
+# Frontend tooling cache; the shipped UI is dependency-free static assets.
+node_modules/
+.npm-cache/
