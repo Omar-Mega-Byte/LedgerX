@@ -66,12 +66,12 @@
 
 **Goal:** make payer-authorized merchant payments subject to explainable, auditable risk decisions without letting review or operator actions move money.
 
-- **In progress:** versioned operator-managed USD rules for a hard amount limit and rolling payer velocity checks
-- **In progress:** durable `ALLOW`, `REVIEW`, and `BLOCK` outcomes integrated with payment idempotency
-- **In progress:** operator review queue and payer-only retry of an approved, exact matching request
-- **In progress:** owner/operator workbench views, audit history, metrics, and reconciliation evidence
+- **Complete:** versioned operator-managed USD rules for a hard amount limit and rolling payer velocity checks
+- **Complete:** durable `ALLOW`, `REVIEW`, and `BLOCK` outcomes integrated with payment idempotency
+- **Complete:** operator review queue and payer-only retry of an approved, exact matching request
+- **Complete:** owner/operator workbench views, audit history, metrics, and reconciliation evidence
 
-**Exit criteria:** a review or block posts no money, an approval alone posts no money, and an approved payer retry can create at most one payment and one completed-payment event. See [Phase 5](../Phase5.md) for the implementation brief. The current workbench changes need verification before Phase 5 depends on them.
+**Exit criteria:** complete — a review or block posts no money, an approval alone posts no money, and an approved payer retry can create at most one payment and one completed-payment event. The full CI run passed 34 unit and 63 integration tests on 2026-09-25. See [Phase 5](../Phase5.md).
 
 Merchant API keys, Redis rate limits, provider simulation, payouts, and multi-currency remain candidates for later phases when a concrete use case justifies them.
 

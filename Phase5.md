@@ -1,6 +1,6 @@
 # Phase 5 — Payment Risk Decisions and Review
 
-**Status: implementation in progress; PostgreSQL integration verification pending.** This brief is based on the repository state on 2026-09-25. Phase 4 was verified on 2026-09-23. The browser workbench, owner activity, operator APIs, and local demo funding were present in the working tree when Phase 5 began.
+**Status: implemented and verified in CI on 2026-09-25.** The final verification ran 34 unit and 63 PostgreSQL/Testcontainers integration tests with no failures; `npm run check:ui` passed. Phase 4 was verified on 2026-09-23. The browser workbench, owner activity, operator APIs, and local demo funding were present in the working tree when Phase 5 began.
 
 ## 1. Goal
 
@@ -50,7 +50,7 @@ The current `payment_idempotency` schema permits only `PROCESSING -> COMPLETED`,
 
 An operator creates an immutable policy version and activates it atomically. Exactly one version is active. Store the actor, activation time, thresholds, and a short change reason. Start with a documented permissive policy and an explicit enablement setting so rollout cannot unexpectedly block existing users. A policy edit creates a new version; past assessments keep the original version ID and rule codes.
 
-Use `Money` and PostgreSQL `NUMERIC(19,2)` for amounts. An exact threshold match is allowed; a value above it matches the rule. The rolling window uses database time or an injected `Clock` consistently and counts only completed payments, including payments that resulted from a prior approval. An empty history counts as zero. Limit active review cases per payer to a small configured maximum; exceeding it produces a durable `BLOCK` outcome to keep the queue bounded.
+Use `Money` and PostgreSQL `NUMERIC(19,2)` for amounts. An exact threshold match is allowed; a value above it matches the rule. The rolling window uses database time or an injected `Clock` consistently and counts only completed payments, including payments that resulted from a prior approval. An empty history counts as zero. Limit active review cases per payer to ten; exceeding that cap produces a durable `BLOCK` outcome to keep the queue bounded.
 
 The public response includes a decision ID, outcome, case ID when relevant, and a safe short reason code. It does not disclose thresholds, other owners, internal scoring inputs, or operator notes. Operators can inspect the matched rule codes and bounded supporting totals. Neither logs nor metrics include owner IDs, idempotency keys, or amounts as metric labels.
 
@@ -129,4 +129,4 @@ Document policy activation, rollback to a prior immutable version, review queue 
 
 Phase 5 is complete only when a payer can create an allowed payment, receive a durable blocked result, or receive a durable review case; an operator can activate a versioned policy and decide a review case; the original payer can complete an approved case exactly once using the same request and key; and all negative outcomes leave ledger/outbox/webhook state unchanged. PostgreSQL constraints, concurrency and production-authorization tests must prove those claims. The workbench and API docs must accurately show the new states, and full Maven plus UI verification must pass.
 
-Until those checks pass, this document is a plan. The presence of a route, table, or UI panel alone does not make Phase 5 implemented.
+The CI verification covered the PostgreSQL migration, payer/operator authorization, approval and expiry, exact-key replay, concurrent payer velocity, rollback after a posting failure, and existing payment, transfer, refund, and webhook regressions.

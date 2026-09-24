@@ -31,7 +31,7 @@
 | WHK-01 | P1 | **Complete** — deliver signed webhooks with retry tracking | Signatures, retry schedule, failures, and manual replay are auditable |
 | OPS-01 | P1 | **Complete** — containerize local dependencies/application and add CI verification | Docker-based startup passes locally; GitHub Actions runs `verify` on pushes and pull requests; `main` requires its green check for pull requests |
 | COL-01 | P1 | **Complete** — establish contribution triage metadata | Type, priority, area, and triage labels exist; structured bug and feature issue forms are available |
-| RSK-01 | P2 | **In progress for Phase 5** — versioned payment risk rules and an operator review queue | ALLOW, REVIEW, and BLOCK are durable, owner-scoped, and replayable; review/approval alone moves no money; an approved exact-key payer retry completes at most once |
+| RSK-01 | P2 | **Complete** — versioned payment risk rules and an operator review queue | ALLOW, REVIEW, and BLOCK are durable, owner-scoped, and replayable; review/approval alone moves no money; an approved exact-key payer retry completes at most once |
 | REC-01 | P2 | **Complete** — read-only reconciliation job | Unbalanced journals and missing payment/refund outbox facts are reported without repair; broader checks remain future work |
 | OBS-01 | P2 | **Partial** — bounded operational metrics and health are present; broader tracing/dashboard work is deferred | Outbox, webhook, and reconciliation signals are exposed without making merchant endpoint failure an application outage |
 | EXT-01 | P3 | Evaluate external-provider simulation, Kubernetes, or multi-currency conversion | Added only with a specific scenario and documented trade-off |
