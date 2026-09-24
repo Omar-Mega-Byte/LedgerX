@@ -10,3 +10,7 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+## Graphify maintenance on Windows
+
+Use `./scripts/update-graphify.ps1` for updates from PowerShell. Graphify 0.9.67 can exit silently on Windows before rebuilding when `PYTHONHASHSEED` is unset; the script pins it for that process and restores the previous value. Git hooks installed with `graphify hook install` already pin the seed. In a restricted Codex shell, a `uv trampoline failed to canonicalize script path` error means the user-level tool directory is outside the sandbox; retry the Graphify command with filesystem escalation rather than treating it as unavailable.

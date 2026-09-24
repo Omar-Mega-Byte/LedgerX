@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface LedgerAccountRepository extends JpaRepository<LedgerAccount, UUID> {
 
+  List<LedgerAccount> findAllByOwnerIdOrderByCreatedAtAsc(UUID ownerId);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       "SELECT account FROM LedgerAccount account WHERE account.id IN :accountIds ORDER BY account.id")

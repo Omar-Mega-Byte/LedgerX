@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ledgerx.reliability.PaymentEventEnvelope;
 import com.ledgerx.wallet.domain.OwnerType;
 import com.ledgerx.wallet.domain.WalletOwner;
 import com.ledgerx.wallet.persistence.WalletOwnerRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
@@ -53,6 +55,8 @@ class WebhookEndpointApiIntegrationTest {
   @Autowired private WalletOwnerRepository walletOwnerRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private Clock clock;
+  @Autowired private WebhookEndpointStore endpointStore;
+  @Autowired private WebhookDeliveryStore deliveryStore;
 
   private UUID merchantOwnerId;
 
@@ -68,7 +72,7 @@ class WebhookEndpointApiIntegrationTest {
   @BeforeEach
   void clearData() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
+        "TRUNCATE TABLE ledgerx.risk_review_actions, ledgerx.risk_review_cases, ledgerx.risk_assessments, ledgerx.demo_fundings, ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
             + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "
             + "ledgerx.webhook_endpoint_idempotency, ledgerx.webhook_endpoints, "
             + "ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
@@ -207,6 +211,58 @@ class WebhookEndpointApiIntegrationTest {
                     String.class)
                 .getStatusCode())
         .isEqualTo(HttpStatus.CONFLICT);
+  }
+
+  @Test
+  void deliveryAttemptHistoryIsOwnedAndRedactsPayloadAndSecret() throws Exception {
+    ResponseEntity<String> created =
+        create(
+            request("https://merchant.example.com/hooks", SIGNING_SECRET),
+            ownerHeaders("attempts"));
+    UUID endpointId =
+        UUID.fromString(objectMapper.readTree(created.getBody()).path("endpointId").asText());
+    PaymentEventEnvelope event =
+        new PaymentEventEnvelope(
+            UUID.randomUUID(),
+            "payment.completed.v1",
+            UUID.randomUUID(),
+            1,
+            1,
+            clock.instant(),
+            Map.of());
+    deliveryStore.enqueue(
+        endpointStore.findById(endpointId).orElseThrow(), event, "{\"private\":true}");
+    WebhookClaim claim =
+        deliveryStore.claimNext(clock.instant(), Duration.ofMinutes(1)).orElseThrow();
+    deliveryStore.markDelivered(claim, clock.instant(), clock.instant(), 204);
+
+    String path =
+        "/api/v1/webhook-endpoints/"
+            + endpointId
+            + "/deliveries/"
+            + claim.delivery().id()
+            + "/attempts";
+    ResponseEntity<String> own =
+        restTemplate.exchange(
+            path, HttpMethod.GET, new HttpEntity<>(ownerHeaders(null)), String.class);
+    assertThat(own.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(own.getBody()).doesNotContain("private", SIGNING_SECRET);
+    JsonNode attempts = objectMapper.readTree(own.getBody());
+    assertThat(attempts.size()).isEqualTo(1);
+    assertThat(attempts.get(0).path("outcome").asText()).isEqualTo("DELIVERED");
+    assertThat(attempts.get(0).path("httpStatus").asInt()).isEqualTo(204);
+
+    UUID otherMerchantId =
+        walletOwnerRepository.save(WalletOwner.create(OwnerType.MERCHANT, clock)).id();
+    assertThat(
+            restTemplate
+                .exchange(
+                    path,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headersFor(otherMerchantId, null)),
+                    String.class)
+                .getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
   }
 
   private ResponseEntity<String> create(Map<String, Object> request, HttpHeaders headers) {

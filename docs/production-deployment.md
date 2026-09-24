@@ -60,6 +60,19 @@ Invoke-WebRequest https://YOUR_LEDGERX_PUBLIC_DOMAIN/actuator/health
 
 Swagger is intentionally disabled in production. Use a local profile for interactive API exercises.
 
+Open `https://YOUR_LEDGERX_PUBLIC_DOMAIN/` for the LedgerX workbench. The realm import creates the
+public `ledgerx-web` client with an exact redirect URI and web origin from `LEDGERX_PUBLIC_DOMAIN`.
+It uses Authorization Code with PKCE; no browser client secret is required. The workbench and API
+share an origin, and access tokens stay in browser memory. A page refresh requires signing in
+again; an existing Keycloak session normally makes this quick.
+
+Realm import does not overwrite an existing realm during normal startup. If this realm predates
+the workbench, add or update the `ledgerx-web` public client in Keycloak with Standard Flow and
+S256 PKCE, `https://YOUR_LEDGERX_PUBLIC_DOMAIN/` as its exact valid redirect URI, and
+`https://YOUR_LEDGERX_PUBLIC_DOMAIN` as its web origin. Add
+`https://YOUR_LEDGERX_PUBLIC_DOMAIN/?signed-out=1` as a valid post-logout redirect URI. Keep the
+`ledgerx-api` audience mapper on the access token.
+
 ## Keycloak owner mapping
 
 The first startup imports the `ledgerx` realm and the `ledgerx-api` audience client. Sign in to the
@@ -71,9 +84,35 @@ For each user allowed to call LedgerX, set the user attribute `ledgerx_owner_id`
 existing active `wallet_owners` record. The imported `ledgerx-owner` client scope includes this UUID
 and the `ledgerx-api` audience in signed access tokens. LedgerX rejects a token missing either.
 
-Do not create a password-grant client merely to test the API. A browser, mobile application, or BFF
-should use an Authorization Code flow with PKCE and a deliberately chosen redirect URI when a client
-is added. That client is outside this backend deployment scope.
+For operator users, assign the `ledgerx-operator` realm role in Keycloak. Spring Security checks
+that role on `/api/v1/operations/**`; a normal wallet owner token cannot provision owners, suspend
+wallets, or read global reconciliation evidence. An operator without a wallet owner claim can use
+Operations but cannot enter the owner-scoped wallet workbench. Provisioning creates an empty USD
+wallet and returns its owner ID; link that ID to a Keycloak user separately. There is no public
+deposit or funding action. Use the existing controlled setup process for initial balances.
+
+The workbench handles unknown outcomes of idempotent financial and provisioning requests by
+retrying the same payload with the same key. Retain `operator_provisioning_requests` with the rest
+of the financial database when migrating or restoring data.
+
+## Payment risk rollout
+
+The V13 migration installs an inactive policy. Payments retain their previous behavior until an
+operator activates a new version from the Operations workbench or
+`POST /api/v1/operations/risk/policies`. The request requires the `ledgerx-operator` role, an
+`Idempotency-Key`, a change reason, exact USD thresholds, and the expected current version.
+Start with permissive thresholds and inspect the review queue before tightening them. A new
+policy version is immutable; to revert, activate another version with the prior thresholds.
+
+An open review expires after seven days. Approval lasts 24 hours and does not reserve funds or
+move money; the original payer must retry the same payment payload and idempotency key. Blocks,
+declines, and expirations leave the ledger and outbox unchanged. Keep `risk_policy_versions`,
+`risk_assessments`, `risk_review_cases`, and `risk_review_actions` with the financial database
+when backing up or restoring. `/actuator/metrics` is available only to operators in production;
+`/actuator/health` reports when the active risk policy is unavailable.
+
+Do not create a password-grant client merely to test the API. The included browser client uses
+Authorization Code with PKCE and the exact LedgerX redirect URI.
 
 ## Operational checks
 
