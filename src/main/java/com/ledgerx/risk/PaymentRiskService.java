@@ -8,14 +8,20 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** PostgreSQL-backed payment risk decisions. Operators never call the financial posting path. */
 @Service
 public class PaymentRiskService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PaymentRiskService.class);
 
   private static final Duration OPEN_LIFETIME = Duration.ofDays(7);
   private static final Duration APPROVAL_LIFETIME = Duration.ofHours(24);
@@ -64,6 +70,15 @@ public class PaymentRiskService {
    * ledger lock order.
    */
   public Decision assess(UUID payerOwnerId, Money money, boolean approvedReview) {
+    try {
+      return evaluate(payerOwnerId, money, approvedReview);
+    } catch (RuntimeException exception) {
+      metrics.evaluationError();
+      throw exception;
+    }
+  }
+
+  private Decision evaluate(UUID payerOwnerId, Money money, boolean approvedReview) {
     Policy policy = activePolicy();
     if (!policy.enabled()) {
       return new Decision(policy.id(), approvedReview, "ALLOW", "", 0, BigDecimal.ZERO);
@@ -128,15 +143,16 @@ public class PaymentRiskService {
       String fingerprint,
       UUID paymentId) {
     if (decision.enabled()) {
-      insertAssessment(
-          decision,
-          idempotencyId,
-          payerOwnerId,
-          payerWalletId,
-          merchantWalletId,
-          fingerprint,
-          paymentId);
-      metrics.decided("ALLOW");
+      UUID assessmentId =
+          insertAssessment(
+              decision,
+              idempotencyId,
+              payerOwnerId,
+              payerWalletId,
+              merchantWalletId,
+              fingerprint,
+              paymentId);
+      recordedDecision("ALLOW", assessmentId, null, decision.ruleCodes());
     }
   }
 
@@ -173,7 +189,7 @@ public class PaymentRiskService {
         Timestamp.from(expiresAt),
         Timestamp.from(now),
         Timestamp.from(now));
-    metrics.decided("REVIEW");
+    recordedDecision("REVIEW", assessmentId, caseId, decision.ruleCodes());
     return new RiskResult(assessmentId, caseId, "REVIEW", "OPEN", expiresAt);
   }
 
@@ -204,7 +220,7 @@ public class PaymentRiskService {
           Timestamp.from(clock.instant()),
           reviewedCaseId);
     }
-    metrics.decided("BLOCK");
+    recordedDecision("BLOCK", decisionId, reviewedCaseId, decision.ruleCodes());
     return new RiskResult(
         decisionId,
         reviewedCaseId,
@@ -353,20 +369,54 @@ public class PaymentRiskService {
   @Transactional
   public void expireCases() {
     Timestamp now = Timestamp.from(clock.instant());
-    jdbc.update(
-        """
+    int openExpired =
+        jdbc.update(
+            """
         UPDATE ledgerx.risk_review_cases SET status = 'EXPIRED', updated_at = ?
         WHERE status = 'OPEN' AND open_expires_at <= ?
         """,
-        now,
-        now);
-    jdbc.update(
-        """
+            now,
+            now);
+    int approvedExpired =
+        jdbc.update(
+            """
         UPDATE ledgerx.risk_review_cases SET status = 'EXPIRED', updated_at = ?
         WHERE status = 'APPROVED' AND approval_expires_at <= ?
         """,
-        now,
-        now);
+            now,
+            now);
+    afterCommit(
+        () -> {
+          metrics.expired("OPEN", openExpired);
+          metrics.expired("APPROVED", approvedExpired);
+        });
+  }
+
+  private void recordedDecision(String outcome, UUID decisionId, UUID caseId, String ruleCodes) {
+    afterCommit(
+        () -> {
+          metrics.decided(outcome);
+          LOG.info(
+              "payment risk decision outcome={} decision_id={} case_id={} rule_codes={}",
+              outcome,
+              decisionId,
+              caseId,
+              ruleCodes);
+        });
+  }
+
+  private void afterCommit(Runnable action) {
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              action.run();
+            }
+          });
+    } else {
+      action.run();
+    }
   }
 
   private ReviewCase caseByIdempotency(UUID idempotencyId, boolean lock) {
