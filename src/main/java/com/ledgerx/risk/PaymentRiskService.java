@@ -443,6 +443,13 @@ public class PaymentRiskService {
     if (current.versionNumber() != expectedVersion) {
       throw new RiskConflictException("active risk policy version has changed");
     }
+    Long nextVersion =
+        jdbc.queryForObject(
+            "SELECT COALESCE(MAX(version_number), 0) + 1 FROM ledgerx.risk_policy_versions",
+            Long.class);
+    if (nextVersion == null) {
+      throw new IllegalStateException("risk policy version sequence is unavailable");
+    }
     UUID id = UUID.randomUUID();
     Instant now = clock.instant();
     jdbc.update(
@@ -453,7 +460,7 @@ public class PaymentRiskService {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         id,
-        current.versionNumber() + 1,
+        nextVersion,
         enabled,
         maxPaymentAmount,
         reviewPaymentCount,
@@ -466,7 +473,7 @@ public class PaymentRiskService {
         "UPDATE ledgerx.risk_policy_activation SET policy_id = ? WHERE singleton_id = 1", id);
     return new Policy(
         id,
-        current.versionNumber() + 1,
+        nextVersion,
         enabled,
         maxPaymentAmount,
         reviewPaymentCount,
