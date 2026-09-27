@@ -24,6 +24,8 @@ production does not expose that endpoint. The workbench cannot repair ledger ent
 
 Event and webhook recovery, key rotation, retention, and reconciliation procedures are in
 [event operations](docs/event-operations.md).
+Operational alerts, verified database backups, restore, and broker-loss procedures are in
+[disaster recovery](docs/disaster-recovery.md).
 
 Payment risk starts with a disabled policy. An operator can activate versioned USD amount and
 24-hour velocity rules. `ALLOW` completes through the existing ledger/outbox flow; `REVIEW` and

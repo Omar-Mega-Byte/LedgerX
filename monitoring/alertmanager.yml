@@ -1,0 +1,10 @@
+route:
+  receiver: local-alerts
+  group_by: [alertname, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+# Alerts are visible at http://127.0.0.1:9093. Configure a real receiver for notifications.
+receivers:
+  - name: local-alerts

@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: LedgerX operations
+    orgId: 1
+    folder: LedgerX
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
