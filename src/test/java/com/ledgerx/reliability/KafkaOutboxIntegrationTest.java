@@ -11,6 +11,7 @@ import com.ledgerx.ledger.domain.EntrySide;
 import com.ledgerx.ledger.domain.PostingLine;
 import com.ledgerx.money.CurrencyCode;
 import com.ledgerx.money.Money;
+import com.ledgerx.operations.OperationalMetrics;
 import com.ledgerx.payment.application.PaymentApplicationService;
 import com.ledgerx.payment.application.PaymentExecution;
 import com.ledgerx.payment.domain.PaymentCommand;
@@ -18,7 +19,9 @@ import com.ledgerx.wallet.application.WalletAccountService;
 import com.ledgerx.wallet.application.WalletRegistration;
 import com.ledgerx.wallet.domain.OwnerType;
 import com.ledgerx.webhook.WebhookEndpointApplicationService;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
@@ -28,16 +31,20 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -81,6 +88,12 @@ class KafkaOutboxIntegrationTest {
   @Autowired private OutboxReplayService outboxReplayService;
   @Autowired private KafkaTemplate<String, String> kafkaTemplate;
   @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private OutboxEventStore outboxEventStore;
+  @Autowired private OutboxProperties outboxProperties;
+  @Autowired private KafkaProperties kafkaProperties;
+  @Autowired private OperationalMetrics metrics;
+  @Autowired private Clock clock;
+  @Autowired private MeterRegistry meterRegistry;
 
   @DynamicPropertySource
   static void configureInfrastructure(DynamicPropertyRegistry registry) {
@@ -198,6 +211,8 @@ class KafkaOutboxIntegrationTest {
 
   @Test
   void malformedEventIsDeadLetteredAndDoesNotStallTheConsumerGroups() throws Exception {
+    double publishedBefore =
+        meterRegistry.get("ledgerx.kafka.dead_letter.publish").counter().count();
     String malformed = "{not-valid-json";
     RecordMetadata metadata =
         kafkaTemplate
@@ -207,6 +222,12 @@ class KafkaOutboxIntegrationTest {
 
     awaitConsumerOffsetPast(metadata, "ledgerx-payment-event-audit-v1");
     awaitConsumerOffsetPast(metadata, "ledgerx-webhook-delivery-enqueuer-v1");
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () ->
+                assertThat(meterRegistry.get("ledgerx.kafka.dead_letter.publish").counter().count())
+                    .isGreaterThanOrEqualTo(publishedBefore + 2));
     try (KafkaConsumer<String, String> consumer =
         new KafkaConsumer<>(
             Map.of(
@@ -227,6 +248,101 @@ class KafkaOutboxIntegrationTest {
               () ->
                   assertThat(consumer.poll(Duration.ofMillis(300)).records(partition))
                       .anySatisfy(record -> assertThat(record.value()).isEqualTo(malformed)));
+    }
+  }
+
+  @Test
+  void replaysAnImmutableEventIntoAFreshBrokerAfterKafkaDataLoss() throws Exception {
+    FundedWallet payer = fundedWallet(OwnerType.PERSON, "100.00");
+    WalletRegistration merchant = walletAccountService.createWallet(OwnerType.MERCHANT);
+    PaymentExecution payment =
+        paymentApplicationService.create(
+            new OwnerContext(payer.ownerId()),
+            new PaymentCommand(
+                payer.walletId(),
+                merchant.walletAccountId(),
+                money("7.00"),
+                "broker-loss-" + UUID.randomUUID()));
+    outboxPublisher.publishAvailable();
+    awaitProcessedEvent(payment.payment().id(), 2);
+    UUID eventId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM ledgerx.outbox_events WHERE aggregate_id = ?",
+            UUID.class,
+            payment.payment().id());
+    String payload =
+        jdbcTemplate.queryForObject(
+            "SELECT payload::text FROM ledgerx.outbox_events WHERE id = ?", String.class, eventId);
+
+    try (KafkaContainer replacement =
+        new KafkaContainer(DockerImageName.parse("apache/kafka:3.9.1"))) {
+      replacement.start();
+      try (AdminClient admin =
+          AdminClient.create(
+              Map.of(
+                  AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, replacement.getBootstrapServers()))) {
+        admin
+            .createTopics(
+                List.of(new NewTopic(kafkaProperties.getPaymentEventsTopic(), 1, (short) 1)))
+            .all()
+            .get(10, TimeUnit.SECONDS);
+      }
+      DefaultKafkaProducerFactory<String, String> producerFactory =
+          new DefaultKafkaProducerFactory<>(
+              Map.of(
+                  ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, replacement.getBootstrapServers(),
+                  ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
+                  ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class));
+      try {
+        KafkaTemplate<String, String> replacementTemplate = new KafkaTemplate<>(producerFactory);
+        outboxReplayService.requestReplay(
+            eventId, "broker-loss-" + UUID.randomUUID(), "Fresh broker recovery drill", "operator");
+        new OutboxPublisher(
+                outboxEventStore,
+                replacementTemplate,
+                outboxProperties,
+                kafkaProperties,
+                clock,
+                metrics)
+            .publishAvailable();
+      } finally {
+        producerFactory.destroy();
+      }
+      try (KafkaConsumer<String, String> consumer =
+          new KafkaConsumer<>(
+              Map.of(
+                  ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                  replacement.getBootstrapServers(),
+                  ConsumerConfig.GROUP_ID_CONFIG,
+                  "recovery-check-" + UUID.randomUUID(),
+                  ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                  StringDeserializer.class,
+                  ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                  StringDeserializer.class))) {
+        TopicPartition partition = new TopicPartition(kafkaProperties.getPaymentEventsTopic(), 0);
+        consumer.assign(List.of(partition));
+        consumer.seekToBeginning(List.of(partition));
+        await()
+            .atMost(Duration.ofSeconds(10))
+            .untilAsserted(
+                () ->
+                    assertThat(consumer.poll(Duration.ofMillis(300)).records(partition))
+                        .anySatisfy(
+                            record -> {
+                              assertThat(record.key()).isEqualTo(payment.payment().id().toString());
+                              assertThat(record.value()).isEqualTo(payload);
+                            }));
+      }
+      assertThat(
+              jdbcTemplate.queryForObject(
+                  "SELECT status FROM ledgerx.outbox_events WHERE id = ?", String.class, eventId))
+          .isEqualTo("PUBLISHED");
+      assertThat(
+              jdbcTemplate.queryForObject(
+                  "SELECT replay_count FROM ledgerx.outbox_events WHERE id = ?",
+                  Integer.class,
+                  eventId))
+          .isEqualTo(1);
     }
   }
 

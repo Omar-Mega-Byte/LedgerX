@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ledgerx.operations.OperationalMetrics;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -68,7 +69,8 @@ class OutboxPublisherTest {
         kafkaTemplate,
         outboxProperties,
         kafkaProperties,
-        Clock.fixed(NOW, ZoneOffset.UTC));
+        Clock.fixed(NOW, ZoneOffset.UTC),
+        Mockito.mock(OperationalMetrics.class));
   }
 
   private OutboxEvent event() {

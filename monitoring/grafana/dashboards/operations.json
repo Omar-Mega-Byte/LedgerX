@@ -1,0 +1,65 @@
+{
+  "uid": "ledgerx-operations",
+  "title": "LedgerX operations",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Database available", "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
+      "targets": [{ "expr": "ledgerx_database_available", "refId": "A" }],
+      "fieldConfig": { "defaults": { "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [{ "color": "red" }, { "color": "green", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "id": 2, "type": "stat", "title": "Stalled outbox events", "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
+      "targets": [{ "expr": "ledgerx_outbox_stalled", "refId": "A" }]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Dead webhooks", "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
+      "targets": [{ "expr": "ledgerx_webhook_dead", "refId": "A" }]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Critical integrity findings", "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
+      "targets": [{ "expr": "ledgerx_reconciliation_last_run_critical_findings", "refId": "A" }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Outbox pending and age", "gridPos": { "x": 0, "y": 5, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "ledgerx_outbox_pending", "legendFormat": "pending", "refId": "A" },
+        { "expr": "ledgerx_outbox_oldest_pending_age_seconds", "legendFormat": "oldest seconds", "refId": "B" }
+      ]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Webhook queue and failures", "gridPos": { "x": 12, "y": 5, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "ledgerx_webhook_pending", "legendFormat": "pending", "refId": "A" },
+        { "expr": "ledgerx_webhook_stalled", "legendFormat": "stalled", "refId": "B" },
+        { "expr": "ledgerx_webhook_dead", "legendFormat": "dead", "refId": "C" }
+      ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Outbox publish results", "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum by (result) (rate(ledgerx_outbox_publish_total[5m]))", "legendFormat": "{{result}}", "refId": "A" }]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "DLT publications", "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+      "targets": [{ "expr": "increase(ledgerx_kafka_dead_letter_publish_total[10m])", "refId": "A" }]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Reconciliation age and status", "gridPos": { "x": 0, "y": 21, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "ledgerx_reconciliation_last_run_age_seconds", "legendFormat": "run age seconds", "refId": "A" },
+        { "expr": "ledgerx_reconciliation_last_run_failed", "legendFormat": "failed", "refId": "B" }
+      ]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "HTTP server errors", "gridPos": { "x": 12, "y": 21, "w": 12, "h": 8 },
+      "targets": [{ "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m]))", "refId": "A" }]
+    },
+    {
+      "id": 11, "type": "stat", "title": "Kafka broker available", "gridPos": { "x": 0, "y": 29, "w": 6, "h": 5 },
+      "targets": [{ "expr": "ledgerx_kafka_broker_available", "refId": "A" }]
+    }
+  ]
+}

@@ -2,8 +2,8 @@
 
 This deployment uses one server, Docker Compose, Caddy, Keycloak, PostgreSQL, and Kafka. It does
 not require a paid cloud service. The production Compose file publishes only Caddy's TCP ports 80
-and 443; LedgerX, both PostgreSQL databases, Kafka, and Keycloak remain on the private Docker
-network.
+and 443 externally; monitoring UIs bind to loopback. LedgerX, both PostgreSQL databases, Kafka,
+and Keycloak remain on private Docker networks.
 
 ## Before starting
 
@@ -12,7 +12,10 @@ network.
    Supply `LEDGERX_WEBHOOK_ENCRYPTION_KEY` or `LEDGERX_WEBHOOK_ENCRYPTION_KEYS` with a
    base64-encoded 32-byte key before enabling webhook workers. The production Compose service
    passes the webhook and reconciliation settings from this file into LedgerX. Restrict access to
-   the environment file and use the deployment secret store where available.
+   the environment file and use the deployment secret store where available. Create a private
+   Grafana admin password file at `GRAFANA_ADMIN_PASSWORD_FILE` before validating Compose.
+   Grafana reads it as a Docker secret; keep it off version control and preserve it with the
+   other deployment secrets.
 2. Register separate public DNS names for the LedgerX API and Keycloak. Set
    `LEDGERX_PUBLIC_DOMAIN` and `KEYCLOAK_PUBLIC_DOMAIN`; both names must resolve to the server's
    public IP address.
@@ -48,7 +51,7 @@ docker compose --env-file .env -f compose.production.yaml up -d --build
 docker compose --env-file .env -f compose.production.yaml ps
 ```
 
-The `caddy` service is the only container with host ports. Caddy automatically obtains and renews
+The `caddy` service is the only container with externally bound host ports. Caddy automatically obtains and renews
 HTTPS certificates and proxies `LEDGERX_PUBLIC_DOMAIN` to `ledgerx:8080` and
 `KEYCLOAK_PUBLIC_DOMAIN` to `keycloak:8080`. Caddy certificate data is persisted in the
 `caddy-data` Docker volume; do not delete that volume casually.
@@ -113,6 +116,10 @@ retention, and reconciliation evidence.
 Treat failed reconciliation runs, stale outbox events, missing consumer receipts, and dead webhook
 deliveries as incident signals. The reconciliation job is read-only and leaves immutable findings;
 it does not repair a financial discrepancy.
+Prometheus, Alertmanager, and Grafana run on a private monitoring network and bind their UIs to
+host loopback only. The public proxy blocks `/actuator/prometheus`. Configure an alert receiver and
+exercise it before relying on notifications. See [disaster recovery](disaster-recovery.md) for
+backup, isolated restore, and Kafka-loss procedures.
 
 ## Payment risk rollout
 

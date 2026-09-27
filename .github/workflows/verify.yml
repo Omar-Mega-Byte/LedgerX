@@ -23,5 +23,10 @@ jobs:
           cache: npm
       - name: Check workbench types
         run: npm ci && npm run check:ui
+      - name: Validate production Compose configuration
+        run: |
+          mkdir -p secrets
+          : > secrets/grafana-admin-password
+          docker compose --env-file .env.example -f compose.production.yaml config --quiet
       - name: Verify
         run: bash ./mvnw --batch-mode verify
