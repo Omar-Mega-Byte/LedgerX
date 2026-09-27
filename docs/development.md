@@ -41,6 +41,14 @@ The standard local verification command is:
 
 Use `*Test` for fast unit tests and `*IntegrationTest` for Docker-backed integration tests. The latter run during Maven's `verify` phase, not its unit-test phase.
 
+## Local demo wallet funding
+
+In the local profile, open a wallet in the workbench and choose **Add demo money**. Each top-up accepts
+$0.01–$10,000.00 USD, requires an idempotency key, and writes a balanced clearing debit and wallet
+credit. The updated balance and top-up appear in the wallet and Activity views. The endpoint is
+`POST /api/v1/demo/wallets/{walletId}/fundings`; it requires the local owner header and is absent in
+the production profile. These are test funds in the local database, not a payment or deposit.
+
 ## Commit guidance
 
 Use small, coherent commits with a conventional prefix where practical, for example `docs:`, `chore:`, `build:`, `test:`, or `feat:`. Avoid mixing formatting-only changes with behavioral changes.
@@ -48,3 +56,16 @@ Use small, coherent commits with a conventional prefix where practical, for exam
 ## Documentation maintenance
 
 Update the README when setup, runnable capabilities, or major project claims change. Update [architecture.md](architecture.md) when a material design decision is made. `PROJECT_CONTEXT.txt` remains the broader living product context; newer explicit requirements take precedence.
+
+## Graphify knowledge graph
+
+The local graph in `graphify-out/` is generated and ignored by Git. Install the official Graphify CLI with the SQL parser so database migrations are represented:
+
+```powershell
+uv tool install 'graphifyy[sql]'
+graphify install --project --platform codex
+graphify hook install
+.\scripts\update-graphify.ps1
+```
+
+Use `graphify query "<question>"`, `graphify path "<A>" "<B>"`, and `graphify explain "<concept>"` for focused codebase navigation. The script updates code and SQL without an API key. On Windows, call the script instead of bare `graphify update .` because Graphify 0.9.67 can exit before rebuilding unless `PYTHONHASHSEED` is set. The installed Git hooks refresh the graph after commits and branch switches; run the script after a pull or merge. For changed documentation, use the Graphify skill's incremental update flow.

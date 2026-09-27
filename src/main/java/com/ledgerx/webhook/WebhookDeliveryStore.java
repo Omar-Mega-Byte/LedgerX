@@ -254,6 +254,35 @@ public class WebhookDeliveryStore {
         limit);
   }
 
+  public List<WebhookDeliveryAttempt> findAttempts(UUID deliveryId, int limit, int offset) {
+    return jdbcTemplate.query(
+        """
+        SELECT id, replay_count, attempt_number, started_at, completed_at,
+               outcome, http_status, duration_millis, error_category
+        FROM ledgerx.webhook_delivery_attempts
+        WHERE webhook_delivery_id = ?
+        ORDER BY started_at DESC, id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (resultSet, rowNumber) -> {
+          int httpStatus = resultSet.getInt("http_status");
+          boolean hasHttpStatus = !resultSet.wasNull();
+          return new WebhookDeliveryAttempt(
+              resultSet.getObject("id", UUID.class),
+              resultSet.getInt("replay_count"),
+              resultSet.getInt("attempt_number"),
+              resultSet.getTimestamp("started_at").toInstant(),
+              resultSet.getTimestamp("completed_at").toInstant(),
+              WebhookDeliveryOutcome.valueOf(resultSet.getString("outcome")),
+              hasHttpStatus ? httpStatus : null,
+              resultSet.getLong("duration_millis"),
+              resultSet.getString("error_category"));
+        },
+        deliveryId,
+        limit,
+        offset);
+  }
+
   public boolean replay(UUID deliveryId) {
     Instant now = clock.instant();
     return jdbcTemplate.update(

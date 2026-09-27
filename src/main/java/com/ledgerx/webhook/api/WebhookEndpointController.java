@@ -136,6 +136,21 @@ public class WebhookEndpointController {
     return ResponseEntity.accepted().build();
   }
 
+  @GetMapping("/{endpointId}/deliveries/{deliveryId}/attempts")
+  public List<WebhookDeliveryAttemptResponse> listAttempts(
+      @RequestHeader(value = OWNER_HEADER, required = false) String ownerHeader,
+      @AuthenticationPrincipal Jwt authenticatedToken,
+      @PathVariable UUID endpointId,
+      @PathVariable UUID deliveryId,
+      @RequestParam(defaultValue = "100") @Min(1) @Max(100) int limit,
+      @RequestParam(defaultValue = "0") @Min(0) @Max(100000) int page) {
+    return endpointService
+        .listAttempts(owner(ownerHeader, authenticatedToken), endpointId, deliveryId, limit, page)
+        .stream()
+        .map(WebhookDeliveryAttemptResponse::from)
+        .toList();
+  }
+
   private OwnerContext owner(String ownerHeader, Jwt authenticatedToken) {
     return ownerContextResolver.resolve(ownerHeader, authenticatedToken);
   }

@@ -69,7 +69,7 @@ class LedgerPostingIntegrationTest {
   @BeforeEach
   void clearFinancialData() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
+        "TRUNCATE TABLE ledgerx.risk_review_actions, ledgerx.risk_review_cases, ledgerx.risk_assessments, ledgerx.demo_fundings, ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
             + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "
             + "ledgerx.webhook_endpoint_idempotency, ledgerx.webhook_endpoints, "
             + "ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "

@@ -20,6 +20,7 @@ import com.ledgerx.wallet.domain.OwnerType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,7 +85,7 @@ class ProductionSecurityIntegrationTest {
   @BeforeEach
   void prepareWalletsAndTokens() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
+        "TRUNCATE TABLE ledgerx.risk_review_actions, ledgerx.risk_review_cases, ledgerx.risk_assessments, ledgerx.demo_fundings, ledgerx.operator_provisioning_requests, ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
             + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "
             + "ledgerx.webhook_endpoint_idempotency, ledgerx.webhook_endpoints, "
             + "ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
@@ -103,6 +104,15 @@ class ProductionSecurityIntegrationTest {
     when(jwtDecoder.decode("source-token")).thenReturn(jwt("source-token", source.ownerId()));
     when(jwtDecoder.decode("other-token")).thenReturn(jwt("other-token", destination.ownerId()));
     when(jwtDecoder.decode("unknown-token")).thenReturn(jwt("unknown-token", UUID.randomUUID()));
+    when(jwtDecoder.decode("operator-token"))
+        .thenReturn(
+            Jwt.withTokenValue("operator-token")
+                .header("alg", "RS256")
+                .subject("operator")
+                .issuedAt(Instant.now().minusSeconds(60))
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .claim("realm_access", Map.of("roles", List.of("ledgerx-operator")))
+                .build());
     when(jwtDecoder.decode("missing-owner-token"))
         .thenReturn(
             Jwt.withTokenValue("missing-owner-token")
@@ -116,6 +126,37 @@ class ProductionSecurityIntegrationTest {
   }
 
   @Test
+  void onlyOperatorsCanActivateRiskPoliciesAndReadMetrics() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/operations/risk/policy").header("Authorization", "Bearer source-token"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(get("/actuator/metrics").header("Authorization", "Bearer source-token"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            get("/api/v1/operations/risk/policy").header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enabled").value(false));
+    mockMvc
+        .perform(
+            post("/api/v1/operations/risk/policies")
+                .header("Authorization", "Bearer source-token")
+                .header("Idempotency-Key", "owner-cannot-activate-risk")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"enabled":true,"maxPaymentAmount":"100.00","reviewPaymentCount":5,
+                     "reviewPaymentTotal":"500.00","reason":"test policy","expectedVersion":1}
+                    """))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(get("/actuator/metrics").header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void productionRejectsMissingInvalidAndExpiredBearerTokens() throws Exception {
     mockMvc.perform(get("/api/v1/webhook-endpoints")).andExpect(status().isUnauthorized());
     mockMvc
@@ -124,6 +165,18 @@ class ProductionSecurityIntegrationTest {
     mockMvc
         .perform(get("/api/v1/webhook-endpoints").header("Authorization", "Bearer expired-token"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void productionNeverAllowsDemoFundingEvenForAnOperator() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/demo/wallets/{walletId}/fundings", source.walletAccountId())
+                .header("Authorization", "Bearer operator-token")
+                .header("Idempotency-Key", "no-production-demo-funding")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"money\":{\"amount\":\"1.00\",\"currency\":\"USD\"}}"))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -154,6 +207,45 @@ class ProductionSecurityIntegrationTest {
     assertThat(count("ledgerx.transfers")).isEqualTo(1);
     assertThat(balanceQueryService.balanceOf(source.walletAccountId()).amount())
         .isEqualByComparingTo("15.00");
+    UUID journalId =
+        jdbcTemplate.queryForObject(
+            "SELECT ledger_transaction_id FROM ledgerx.transfers", UUID.class);
+    mockMvc
+        .perform(
+            get("/api/v1/activity")
+                .header("Authorization", "Bearer source-token")
+                .header("X-LedgerX-Owner-Id", destination.ownerId().toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].kind").value("TRANSFER"))
+        .andExpect(jsonPath("$[0].direction").value("OUT"));
+    mockMvc
+        .perform(
+            get("/api/v1/activity")
+                .queryParam("walletId", destination.walletAccountId().toString())
+                .header("Authorization", "Bearer source-token"))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            get("/api/v1/ledger-transactions/{id}", journalId)
+                .header("Authorization", "Bearer source-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.entries.length()").value(2));
+    mockMvc
+        .perform(
+            get("/api/v1/ledger-transactions/{id}", journalId)
+                .header("Authorization", "Bearer unknown-token"))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            get("/api/v1/operations/ledger-transactions/{id}", journalId)
+                .header("Authorization", "Bearer source-token"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            get("/api/v1/operations/ledger-transactions/{id}", journalId)
+                .header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.entries.length()").value(2));
   }
 
   @Test
@@ -172,6 +264,97 @@ class ProductionSecurityIntegrationTest {
                 .header("X-LedgerX-Owner-Id", destination.ownerId().toString()))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("OWNER_IDENTITY_INVALID"));
+  }
+
+  @Test
+  void workbenchUsesSignedOwnerAndKeepsOperationsBehindTheOperatorRole() throws Exception {
+    mockMvc.perform(get("/")).andExpect(status().isOk());
+    mockMvc.perform(get("/ui-config")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/operations/summary")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/operations/summary").header("Authorization", "Bearer source-token"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(get("/api/v1/operations/summary").header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.pendingOutboxEvents").value(0));
+    mockMvc
+        .perform(
+            get("/api/v1/me")
+                .header("Authorization", "Bearer source-token")
+                .header("X-LedgerX-Owner-Id", destination.ownerId().toString()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.ownerId").value(source.ownerId().toString()))
+        .andExpect(jsonPath("$.wallets[0].balance.amount").value("25.00"));
+    mockMvc
+        .perform(
+            post("/api/v1/operations/owners")
+                .header("Authorization", "Bearer source-token")
+                .header("Idempotency-Key", "source-provision")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ownerType\":\"MERCHANT\"}"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post("/api/v1/operations/owners")
+                .header("Authorization", "Bearer operator-token")
+                .header("Idempotency-Key", "operator-provision")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ownerType\":\"MERCHANT\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.ownerType").value("MERCHANT"))
+        .andExpect(jsonPath("$.wallets.length()").value(1));
+    mockMvc
+        .perform(
+            post("/api/v1/operations/owners")
+                .header("Authorization", "Bearer operator-token")
+                .header("Idempotency-Key", "operator-provision")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ownerType\":\"MERCHANT\"}"))
+        .andExpect(status().isOk());
+    assertThat(count("ledgerx.wallet_owners")).isEqualTo(3);
+    mockMvc
+        .perform(
+            post("/api/v1/operations/owners")
+                .header("Authorization", "Bearer operator-token")
+                .header("Idempotency-Key", "operator-provision")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ownerType\":\"PERSON\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("OPERATIONS_CONFLICT"));
+    mockMvc
+        .perform(
+            post("/api/v1/operations/wallets/{id}/close", source.walletAccountId())
+                .header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.code").value("OPERATIONS_NOT_PROCESSABLE"));
+  }
+
+  @Test
+  void operatorCanSuspendAndCloseAnEmptyWalletThroughGuardedRoutes() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/operations/owners/{id}/suspend", destination.ownerId())
+                .header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SUSPENDED"));
+    mockMvc
+        .perform(
+            post("/api/v1/operations/wallets/{id}/suspend", destination.walletAccountId())
+                .header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SUSPENDED"));
+    mockMvc
+        .perform(
+            post("/api/v1/operations/wallets/{id}/close", destination.walletAccountId())
+                .header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CLOSED"));
+    mockMvc
+        .perform(
+            post("/api/v1/operations/wallets/{id}/close", destination.walletAccountId())
+                .header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isUnprocessableEntity());
   }
 
   private Jwt jwt(String tokenValue, UUID ownerId) {

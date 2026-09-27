@@ -2,12 +2,18 @@ package com.ledgerx.payment.persistence;
 
 import com.ledgerx.payment.domain.Refund;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface RefundRepository extends JpaRepository<Refund, UUID> {
+
+  List<Refund> findAllByPaymentIdOrderByCompletedAtAsc(UUID paymentId);
+
+  Optional<Refund> findByIdAndPaymentId(UUID refundId, UUID paymentId);
 
   @Query(
       value =

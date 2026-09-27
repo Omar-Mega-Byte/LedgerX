@@ -4,6 +4,14 @@
   "enabled": true,
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "ledgerx-operator",
+        "description": "May provision wallet owners and inspect LedgerX operational evidence."
+      }
+    ]
+  },
   "bruteForceProtected": true,
   "sslRequired": "external",
   "defaultDefaultClientScopes": [
@@ -66,6 +74,24 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "ledgerx-web",
+      "name": "LedgerX Workbench",
+      "description": "Public browser client using authorization code and PKCE.",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["${LEDGERX_WEB_ORIGIN}/"],
+      "webOrigins": ["${LEDGERX_WEB_ORIGIN}"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${LEDGERX_WEB_ORIGIN}/?signed-out=1"
+      }
     }
   ]
 }
