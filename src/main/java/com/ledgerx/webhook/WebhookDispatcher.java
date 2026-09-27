@@ -63,7 +63,9 @@ public class WebhookDispatcher {
     try {
       signature =
           WebhookSignature.sign(
-              secretCipher.decrypt(claim.secretCiphertext()), timestamp, delivery.payload());
+              secretCipher.decrypt(claim.secretCiphertext(), claim.secretKeyVersion()),
+              timestamp,
+              delivery.payload());
     } catch (RuntimeException exception) {
       completeFailure(claim, startedAt, clock.instant(), null, "SIGNING_FAILURE");
       return true;

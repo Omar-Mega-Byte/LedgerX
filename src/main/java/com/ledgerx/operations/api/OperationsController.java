@@ -216,7 +216,10 @@ public class OperationsController {
 
   @GetMapping("/reconciliation-runs/{runId}/findings")
   @Transactional(readOnly = true)
-  public List<ReconciliationFindingResponse> findings(@PathVariable UUID runId) {
+  public List<ReconciliationFindingResponse> findings(
+      @PathVariable UUID runId,
+      @RequestParam(defaultValue = "100") @Min(1) @Max(500) int limit,
+      @RequestParam(defaultValue = "0") @Min(0) @Max(100000) int page) {
     boolean exists =
         Boolean.TRUE.equals(
             jdbcTemplate.queryForObject(
@@ -232,6 +235,7 @@ public class OperationsController {
         FROM ledgerx.reconciliation_findings
         WHERE reconciliation_run_id = ?
         ORDER BY detected_at, id
+        LIMIT ? OFFSET ?
         """,
         (resultSet, rowNumber) ->
             new ReconciliationFindingResponse(
@@ -242,7 +246,9 @@ public class OperationsController {
                 resultSet.getObject("entity_id", UUID.class),
                 resultSet.getString("details"),
                 resultSet.getTimestamp("detected_at").toInstant()),
-        runId);
+        runId,
+        limit,
+        limit * page);
   }
 
   private WalletOwner owner(UUID ownerId) {

@@ -88,7 +88,7 @@ class PaymentRiskIntegrationTest {
   void reset() {
     TEST_CLOCK.set(Instant.now());
     jdbc.execute(
-        "TRUNCATE TABLE ledgerx.risk_review_actions, ledgerx.risk_review_cases, "
+        "TRUNCATE TABLE ledgerx.webhook_secret_reencryptions, ledgerx.outbox_replay_requests, ledgerx.risk_review_actions, ledgerx.risk_review_cases, "
             + "ledgerx.risk_assessments, ledgerx.demo_fundings, "
             + "ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
             + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "

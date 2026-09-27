@@ -1,8 +1,10 @@
 package com.ledgerx.config;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -13,6 +15,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 /** Production-only resource-server boundary for public LedgerX traffic. */
@@ -22,7 +25,11 @@ import org.springframework.security.web.SecurityFilterChain;
 public class ProductionSecurityConfiguration {
 
   @Bean
-  SecurityFilterChain productionSecurityFilterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain productionSecurityFilterChain(
+      HttpSecurity http,
+      Clock clock,
+      @Value("${ledgerx.security.mutation-limit-per-minute:120}") int mutationLimit)
+      throws Exception {
     return http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(
             sessionManagement ->
@@ -46,6 +53,9 @@ public class ProductionSecurityConfiguration {
             resourceServer ->
                 resourceServer.jwt(
                     jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+        .addFilterAfter(
+            new JwtMutationRateLimitFilter(clock, mutationLimit),
+            BearerTokenAuthenticationFilter.class)
         .build();
   }
 

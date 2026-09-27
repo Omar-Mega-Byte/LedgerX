@@ -1,27 +1,61 @@
 package com.ledgerx.webhook;
 
+import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Optional;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.util.Timeout;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-/** Outbound client deliberately configured not to follow redirects or retain response content. */
+/** Outbound client whose DNS validation is part of opening each network connection. */
 @Component
 public class WebhookHttpClient {
 
-  private final HttpClient httpClient;
-  private final WebhookProperties properties;
+  private final CloseableHttpClient httpClient;
+  private final WebhookUrlPolicy urlPolicy;
 
+  @Autowired
   public WebhookHttpClient(WebhookProperties properties) {
-    this.properties = properties;
+    this(properties, new WebhookDnsResolver(properties));
+  }
+
+  WebhookHttpClient(WebhookProperties properties, WebhookDnsResolver resolver) {
+    this.urlPolicy = new WebhookUrlPolicy(properties);
+    var connectionManager =
+        PoolingHttpClientConnectionManagerBuilder.create()
+            .setDnsResolver(resolver)
+            .setDefaultConnectionConfig(
+                ConnectionConfig.custom()
+                    .setConnectTimeout(
+                        Timeout.ofMilliseconds(properties.getConnectTimeout().toMillis()))
+                    .build())
+            .setMaxConnTotal(20)
+            .setMaxConnPerRoute(5)
+            .build();
     this.httpClient =
-        HttpClient.newBuilder()
-            .connectTimeout(properties.getConnectTimeout())
-            .followRedirects(HttpClient.Redirect.NEVER)
+        HttpClients.custom()
+            .setConnectionManager(connectionManager)
+            .setDefaultRequestConfig(
+                RequestConfig.custom()
+                    .setResponseTimeout(
+                        Timeout.ofMilliseconds(properties.getRequestTimeout().toMillis()))
+                    .build())
+            .disableRedirectHandling()
+            .disableAutomaticRetries()
+            .disableCookieManagement()
+            .disableAuthCaching()
             .build();
   }
 
@@ -34,44 +68,43 @@ public class WebhookHttpClient {
       String signature,
       String payload) {
     try {
-      HttpRequest request =
-          HttpRequest.newBuilder(URI.create(targetUrl))
-              .timeout(properties.getRequestTimeout())
-              .header("Content-Type", "application/json")
-              .header("User-Agent", "LedgerX-Webhooks/1.0")
-              .header("LedgerX-Event-Id", eventId)
-              .header("LedgerX-Event-Type", eventType)
-              .header("LedgerX-Delivery-Id", deliveryId)
-              .header("LedgerX-Timestamp", Long.toString(timestamp))
-              .header("LedgerX-Signature", signature)
-              .POST(HttpRequest.BodyPublishers.ofString(payload))
-              .build();
-      HttpResponse<Void> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-      return new WebhookHttpResponse(response.statusCode(), retryAfter(response));
-    } catch (java.net.http.HttpTimeoutException exception) {
+      HttpPost request = new HttpPost(URI.create(urlPolicy.normalize(targetUrl)));
+      request.setHeader("User-Agent", "LedgerX-Webhooks/1.0");
+      request.setHeader("LedgerX-Event-Id", eventId);
+      request.setHeader("LedgerX-Event-Type", eventType);
+      request.setHeader("LedgerX-Delivery-Id", deliveryId);
+      request.setHeader("LedgerX-Timestamp", Long.toString(timestamp));
+      request.setHeader("LedgerX-Signature", signature);
+      request.setEntity(new StringEntity(payload, ContentType.APPLICATION_JSON));
+      return httpClient.execute(
+          request,
+          response ->
+              new WebhookHttpResponse(
+                  response.getCode(), retryAfter(response.getFirstHeader("Retry-After"))));
+    } catch (InterruptedIOException exception) {
       throw new WebhookTransportException("TIMEOUT", exception);
-    } catch (InterruptedException exception) {
-      Thread.currentThread().interrupt();
-      throw new WebhookTransportException("INTERRUPTED", exception);
-    } catch (Exception exception) {
+    } catch (IOException | RuntimeException exception) {
       throw new WebhookTransportException("NETWORK_ERROR", exception);
     }
   }
 
-  private Duration retryAfter(HttpResponse<?> response) {
-    Optional<String> value = response.headers().firstValue("Retry-After");
-    if (value.isEmpty()) {
+  @PreDestroy
+  public void close() throws IOException {
+    httpClient.close();
+  }
+
+  private Duration retryAfter(Header header) {
+    if (header == null) {
       return null;
     }
+    String value = header.getValue().trim();
     try {
-      long seconds = Long.parseLong(value.get().trim());
+      long seconds = Long.parseLong(value);
       return seconds < 0 ? null : Duration.ofSeconds(seconds);
     } catch (NumberFormatException exception) {
       try {
         Instant retryAt =
-            java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.parse(
-                value.get().trim(), Instant::from);
+            java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.parse(value, Instant::from);
         Duration duration = Duration.between(Instant.now(), retryAt);
         return duration.isNegative() ? Duration.ZERO : duration;
       } catch (Exception ignored) {

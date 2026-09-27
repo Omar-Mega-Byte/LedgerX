@@ -1,9 +1,11 @@
 package com.ledgerx.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -109,10 +111,39 @@ class WebhookHttpClientTest {
     assertThat(throttle.retryAfter()).isEqualTo(Duration.ofSeconds(3));
   }
 
+  @Test
+  void refusesDnsNameThatResolvesToLoopbackBeforeSending() throws Exception {
+    WebhookProperties properties = new WebhookProperties();
+    properties.setAllowHttp(true);
+    WebhookDnsResolver resolver =
+        new WebhookDnsResolver(
+            properties,
+            host -> new InetAddress[] {InetAddress.getByAddress(new byte[] {127, 0, 0, 1})});
+    WebhookHttpClient client = new WebhookHttpClient(properties, resolver);
+    try {
+      assertThatThrownBy(
+              () ->
+                  client.post(
+                      "http://merchant.example.test:" + server.getAddress().getPort() + "/hooks",
+                      "event-id",
+                      "payment.completed.v1",
+                      "delivery-id",
+                      123L,
+                      "v1=abc",
+                      "{}"))
+          .isInstanceOf(WebhookTransportException.class);
+      assertThat(deliveries).hasValue(0);
+    } finally {
+      client.close();
+    }
+  }
+
   private WebhookHttpClient client() {
     WebhookProperties properties = new WebhookProperties();
     properties.setConnectTimeout(Duration.ofSeconds(2));
     properties.setRequestTimeout(Duration.ofSeconds(2));
+    properties.setAllowLocalTargets(true);
+    properties.setAllowHttp(true);
     return new WebhookHttpClient(properties);
   }
 
