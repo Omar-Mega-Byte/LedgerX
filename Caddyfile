@@ -11,6 +11,8 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://{$KEYCLOAK_PUBLIC_DOMAIN}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
 	}
+	@privateMetrics path /actuator/prometheus
+	respond @privateMetrics 404
 	reverse_proxy ledgerx:8080
 }
 

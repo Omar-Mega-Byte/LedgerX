@@ -41,6 +41,8 @@ public class ProductionSecurityConfiguration {
                     .permitAll()
                     .requestMatchers("/actuator/metrics", "/actuator/metrics/**")
                     .hasRole("ledgerx-operator")
+                    .requestMatchers("/actuator/prometheus")
+                    .permitAll()
                     .requestMatchers("/", "/index.html", "/ui/**", "/ui-config")
                     .permitAll()
                     .requestMatchers("/api/v1/demo/**")

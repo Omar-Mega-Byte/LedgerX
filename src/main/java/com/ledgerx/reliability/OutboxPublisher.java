@@ -1,5 +1,6 @@
 package com.ledgerx.reliability;
 
+import com.ledgerx.operations.OperationalMetrics;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,18 +21,21 @@ public class OutboxPublisher {
   private final OutboxProperties outboxProperties;
   private final KafkaProperties kafkaProperties;
   private final Clock clock;
+  private final OperationalMetrics metrics;
 
   public OutboxPublisher(
       OutboxEventStore outboxEventStore,
       KafkaTemplate<String, String> kafkaTemplate,
       OutboxProperties outboxProperties,
       KafkaProperties kafkaProperties,
-      Clock clock) {
+      Clock clock,
+      OperationalMetrics metrics) {
     this.outboxEventStore = outboxEventStore;
     this.kafkaTemplate = kafkaTemplate;
     this.outboxProperties = outboxProperties;
     this.kafkaProperties = kafkaProperties;
     this.clock = clock;
+    this.metrics = metrics;
   }
 
   @Scheduled(fixedDelayString = "${ledgerx.outbox.poll-delay:PT5S}")
@@ -62,13 +66,16 @@ public class OutboxPublisher {
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
       outboxEventStore.scheduleRetry(event, nextAttemptAt(event, now), "publisher interrupted");
+      metrics.outboxRetried();
       return true;
     } catch (Exception exception) {
       outboxEventStore.scheduleRetry(event, nextAttemptAt(event, now), failureMessage(exception));
+      metrics.outboxRetried();
       return true;
     }
 
     outboxEventStore.markPublished(event, clock.instant());
+    metrics.outboxPublished();
     return true;
   }
 
