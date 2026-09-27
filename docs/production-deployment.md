@@ -9,9 +9,10 @@ network.
 
 1. Copy `.env.example` to the ignored `.env` file. Replace every `CHANGE_ME` value with the
    appropriate deployment credential, public domain, or email address. Do not commit `.env`.
-   Replace `LEDGERX_WEBHOOK_ENCRYPTION_KEY` with a base64-encoded 32-byte key before enabling
-   webhook workers. The production Compose service passes the webhook and reconciliation settings
-   from this file into LedgerX.
+   Supply `LEDGERX_WEBHOOK_ENCRYPTION_KEY` or `LEDGERX_WEBHOOK_ENCRYPTION_KEYS` with a
+   base64-encoded 32-byte key before enabling webhook workers. The production Compose service
+   passes the webhook and reconciliation settings from this file into LedgerX. Restrict access to
+   the environment file and use the deployment secret store where available.
 2. Register separate public DNS names for the LedgerX API and Keycloak. Set
    `LEDGERX_PUBLIC_DOMAIN` and `KEYCLOAK_PUBLIC_DOMAIN`; both names must resolve to the server's
    public IP address.
@@ -59,6 +60,11 @@ Invoke-WebRequest https://YOUR_LEDGERX_PUBLIC_DOMAIN/actuator/health
 ```
 
 Swagger is intentionally disabled in production. Use a local profile for interactive API exercises.
+The LedgerX container runs with a read-only filesystem, dropped Linux capabilities, and a private
+database/event network. The application enforces HTTPS port 443 and validates public DNS results
+for outbound merchant delivery. Apply host egress controls for the public HTTPS and DNS access the
+service actually needs; test a merchant endpoint before enabling the dispatcher. The Caddy
+configuration adds HSTS, a workbench content security policy, and browser security headers.
 
 Open `https://YOUR_LEDGERX_PUBLIC_DOMAIN/` for the LedgerX workbench. The realm import creates the
 public `ledgerx-web` client with an exact redirect URI and web origin from `LEDGERX_PUBLIC_DOMAIN`.
@@ -94,6 +100,19 @@ deposit or funding action. Use the existing controlled setup process for initial
 The workbench handles unknown outcomes of idempotent financial and provisioning requests by
 retrying the same payload with the same key. Retain `operator_provisioning_requests` with the rest
 of the financial database when migrating or restoring data.
+
+## Event recovery and integrity
+
+The Kafka broker persists to the `kafka-data` volume. New event and dead-letter topics use the
+configured 14-day and 30-day defaults. Existing topic settings need independent verification.
+Consumer failures retry and then move to the dead-letter topic; inspect and triage them before
+requesting an audited outbox replay. Webhook key rotation and merchant delivery replay have
+separate procedures. See [event operations](event-operations.md) for commands, operator routes,
+retention, and reconciliation evidence.
+
+Treat failed reconciliation runs, stale outbox events, missing consumer receipts, and dead webhook
+deliveries as incident signals. The reconciliation job is read-only and leaves immutable findings;
+it does not repair a financial discrepancy.
 
 ## Payment risk rollout
 

@@ -61,7 +61,7 @@ public class WebhookDeliveryStore {
                    d.event_type, d.schema_version, d.payload, d.payload_sha256, d.queued_at, d.status,
                    d.attempt_count, d.replay_count, d.next_attempt_at, d.lease_token, d.lease_until,
                    d.delivered_at, d.last_http_status, d.last_error,
-                   e.target_url, e.secret_ciphertext
+                   e.target_url, e.secret_ciphertext, e.secret_key_version
             FROM ledgerx.webhook_deliveries d
             JOIN ledgerx.webhook_endpoints e ON e.id = d.webhook_endpoint_id
             WHERE d.status = 'PENDING'
@@ -83,7 +83,8 @@ public class WebhookDeliveryStore {
                 new WebhookClaim(
                     mapDelivery(resultSet),
                     resultSet.getString("target_url"),
-                    resultSet.getBytes("secret_ciphertext")),
+                    resultSet.getBytes("secret_ciphertext"),
+                    resultSet.getInt("secret_key_version")),
             Timestamp.from(now));
     if (candidates.isEmpty()) {
       return Optional.empty();
@@ -130,7 +131,8 @@ public class WebhookDeliveryStore {
                 claimed.lastHttpStatus(),
                 null),
             candidate.targetUrl(),
-            candidate.secretCiphertext()));
+            candidate.secretCiphertext(),
+            candidate.secretKeyVersion()));
   }
 
   @Transactional

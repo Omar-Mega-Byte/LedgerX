@@ -42,11 +42,15 @@ funding mechanism. Keep the bootstrap administrator and database passwords only 
 ## Signed webhooks
 
 Webhook workers are disabled by default. Enable both `LEDGERX_WEBHOOK_CONSUMER_ENABLED` and
-`LEDGERX_WEBHOOK_DISPATCHER_ENABLED` only after supplying `LEDGERX_WEBHOOK_ENCRYPTION_KEY`: a
-base64-encoded 32-byte AES key stored in the deployment secret manager. It encrypts merchant HMAC
-signing secrets at rest and must never be committed, logged, or used as a sample value.
+`LEDGERX_WEBHOOK_DISPATCHER_ENABLED` only after supplying a base64-encoded 32-byte AES key through
+`LEDGERX_WEBHOOK_ENCRYPTION_KEY` or a versioned `LEDGERX_WEBHOOK_ENCRYPTION_KEYS` ring. The active
+version is `LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION`. Store keys in deployment secret management;
+never commit, log, or use production material as a sample. Keep previous versions configured while
+stored endpoints still use them. See [event operations](event-operations.md) for rotation.
 
-Production accepts HTTPS endpoints only and does not follow redirects. Local/test configuration may
+Production accepts HTTPS endpoints on port 443 only and does not follow redirects. The outbound
+client validates every DNS address when it opens a connection and rejects private, local, and
+reserved destinations; it also rechecks a stored URL before delivery. Local/test configuration may
 explicitly allow HTTP and local mock targets for development. A receiver validates the documented
 `LedgerX-Timestamp` and `LedgerX-Signature` headers against the exact raw body, then deduplicates on
 `LedgerX-Event-Id`; external delivery is intentionally at least once.
@@ -54,8 +58,10 @@ explicitly allow HTTP and local mock targets for development. A receiver validat
 `LEDGERX_RECONCILIATION_ENABLED` enables the scheduled read-only integrity checks. These checks record
 findings for operators but never repair, compensate, or mutate money movement.
 The production Compose service forwards these webhook and reconciliation variables from the private
-deployment environment file. Leave the workers disabled until the encryption key and an outbound
-network policy for merchant HTTPS destinations are configured.
+deployment environment file. `LEDGERX_SECURITY_MUTATION_LIMIT_PER_MINUTE` sets the per-JWT-subject
+POST limit in the single application instance (default 120). For multiple application replicas,
+add an edge or shared rate limiter. Keep host-level egress rules limited to the required public
+HTTPS and DNS destinations before exposing merchant webhook registration.
 
 ## Health endpoint
 

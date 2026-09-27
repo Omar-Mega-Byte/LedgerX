@@ -85,7 +85,7 @@ class ProductionSecurityIntegrationTest {
   @BeforeEach
   void prepareWalletsAndTokens() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.risk_review_actions, ledgerx.risk_review_cases, ledgerx.risk_assessments, ledgerx.demo_fundings, ledgerx.operator_provisioning_requests, ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
+        "TRUNCATE TABLE ledgerx.webhook_secret_reencryptions, ledgerx.outbox_replay_requests, ledgerx.risk_review_actions, ledgerx.risk_review_cases, ledgerx.risk_assessments, ledgerx.demo_fundings, ledgerx.operator_provisioning_requests, ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
             + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "
             + "ledgerx.webhook_endpoint_idempotency, ledgerx.webhook_endpoints, "
             + "ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
@@ -154,6 +154,38 @@ class ProductionSecurityIntegrationTest {
     mockMvc
         .perform(get("/actuator/metrics").header("Authorization", "Bearer operator-token"))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void replayAndEncryptionMaintenanceRequireOperatorRole() throws Exception {
+    UUID eventId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/api/v1/operations/outbox-events/{eventId}/replay", eventId)
+                .header("Authorization", "Bearer source-token")
+                .header("Idempotency-Key", "replay-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"recovery drill\"}"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post("/api/v1/operations/outbox-events/{eventId}/replay", eventId)
+                .header("Authorization", "Bearer operator-token")
+                .header("Idempotency-Key", "replay-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"recovery drill\"}"))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            post("/api/v1/operations/webhook-keys/reencrypt")
+                .header("Authorization", "Bearer source-token"))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post("/api/v1/operations/webhook-keys/reencrypt")
+                .header("Authorization", "Bearer operator-token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.reencrypted").value(0));
   }
 
   @Test
