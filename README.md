@@ -22,6 +22,9 @@ offers an idempotent demo top-up backed by a balanced journal entry;
 production does not expose that endpoint. The workbench cannot repair ledger entries. See
 [production deployment](docs/production-deployment.md) for browser client setup.
 
+Event and webhook recovery, key rotation, retention, and reconciliation procedures are in
+[event operations](docs/event-operations.md).
+
 Payment risk starts with a disabled policy. An operator can activate versioned USD amount and
 24-hour velocity rules. `ALLOW` completes through the existing ledger/outbox flow; `REVIEW` and
 `BLOCK` create durable decisions without moving money. An operator approval only permits the

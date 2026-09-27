@@ -23,5 +23,9 @@ class WebhookUrlPolicyTest {
         .isInstanceOf(WebhookValidationException.class);
     assertThatThrownBy(() -> policy.normalize("https://user:password@merchant.example.com/hooks"))
         .isInstanceOf(WebhookValidationException.class);
+    assertThatThrownBy(() -> policy.normalize("https://merchant.example.com:8443/hooks"))
+        .isInstanceOf(WebhookValidationException.class);
+    assertThatThrownBy(() -> policy.normalize("https://100.64.1.1/hooks"))
+        .isInstanceOf(WebhookValidationException.class);
   }
 }

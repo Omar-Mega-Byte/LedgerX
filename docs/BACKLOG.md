@@ -34,6 +34,9 @@
 | RSK-01 | P2 | **Complete** — versioned payment risk rules and an operator review queue | ALLOW, REVIEW, and BLOCK are durable, owner-scoped, and replayable; review/approval alone moves no money; an approved exact-key payer retry completes at most once |
 | REC-01 | P2 | **Complete** — read-only reconciliation job | Unbalanced journals and missing payment/refund outbox facts are reported without repair; broader checks remain future work |
 | OBS-01 | P2 | **Partial** — bounded operational metrics and health are present; broader tracing/dashboard work is deferred | Outbox, webhook, and reconciliation signals are exposed without making merchant endpoint failure an application outage |
+| SEC-02 | P1 | **Implemented, deployment validation pending** — guard merchant webhook egress, rotate encrypted secrets, limit authenticated mutations, and harden public proxy/container defaults | DNS rebinding and local destinations are blocked at connection time; operator-only rotation has immutable evidence; verify host egress, secret storage, and live proxy headers before enabling workers |
+| REC-02 | P1 | **Implemented, recovery drill pending** — broaden reconciliation and preserve failed-run evidence | Ledger, payment/refund, outbox, receipt, and webhook findings are bounded and read-only; exercise a live incident drill |
+| REL-03 | P1 | **Implemented, broker validation pending** — dead-letter consumer failures and support audited outbox replay | Poison events reach DLT, replay preserves the immutable event and consumer deduplication; verify retention on the deployed broker |
 | EXT-01 | P3 | Evaluate external-provider simulation, Kubernetes, or multi-currency conversion | Added only with a specific scenario and documented trade-off |
 
 ## Working rules

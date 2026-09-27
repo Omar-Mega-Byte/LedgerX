@@ -5,6 +5,8 @@ import java.time.Clock;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Persists immutable reconciliation evidence; it intentionally has no financial write methods. */
 @Repository
@@ -18,6 +20,7 @@ public class ReconciliationStore {
     this.clock = clock;
   }
 
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public UUID startRun() {
     UUID runId = UUID.randomUUID();
     jdbcTemplate.update(
@@ -25,7 +28,7 @@ public class ReconciliationStore {
         INSERT INTO ledgerx.reconciliation_runs (
             id, check_version, started_at, completed_at, status, finding_count, failure_category
         )
-        VALUES (?, 1, ?, NULL, 'RUNNING', 0, NULL)
+        VALUES (?, 3, ?, NULL, 'RUNNING', 0, NULL)
         """,
         runId,
         Timestamp.from(clock.instant()));
@@ -64,6 +67,7 @@ public class ReconciliationStore {
     updateRun(runId, "COMPLETED", findingCount, null);
   }
 
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void failRun(UUID runId, String failureCategory) {
     updateRun(runId, "FAILED", 0, failureCategory);
   }

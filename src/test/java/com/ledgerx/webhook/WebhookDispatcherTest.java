@@ -31,7 +31,7 @@ class WebhookDispatcherTest {
     WebhookMetrics webhookMetrics = Mockito.mock(WebhookMetrics.class);
     WebhookClaim claim = claim();
     when(deliveryStore.claimNext(eq(NOW), any(Duration.class))).thenReturn(Optional.of(claim));
-    when(secretCipher.decrypt(claim.secretCiphertext()))
+    when(secretCipher.decrypt(claim.secretCiphertext(), claim.secretKeyVersion()))
         .thenReturn("merchant-secret-0123456789-abcdef");
     when(httpClient.post(any(), any(), any(), any(), any(Long.class), any(), any()))
         .thenReturn(new WebhookHttpResponse(204, null));
@@ -70,7 +70,7 @@ class WebhookDispatcherTest {
     WebhookMetrics webhookMetrics = Mockito.mock(WebhookMetrics.class);
     WebhookClaim claim = claim();
     when(deliveryStore.claimNext(eq(NOW), any(Duration.class))).thenReturn(Optional.of(claim));
-    when(secretCipher.decrypt(claim.secretCiphertext()))
+    when(secretCipher.decrypt(claim.secretCiphertext(), claim.secretKeyVersion()))
         .thenReturn("merchant-secret-0123456789-abcdef");
     when(httpClient.post(any(), any(), any(), any(), any(Long.class), any(), any()))
         .thenReturn(new WebhookHttpResponse(204, null));
@@ -104,7 +104,7 @@ class WebhookDispatcherTest {
     when(deliveryStore.claimNext(eq(NOW), any(Duration.class)))
         .thenReturn(Optional.of(claim))
         .thenReturn(Optional.of(claim));
-    when(secretCipher.decrypt(claim.secretCiphertext()))
+    when(secretCipher.decrypt(claim.secretCiphertext(), claim.secretKeyVersion()))
         .thenReturn("merchant-secret-0123456789-abcdef");
     when(httpClient.post(any(), any(), any(), any(), any(Long.class), any(), any()))
         .thenReturn(
@@ -155,6 +155,7 @@ class WebhookDispatcherTest {
             null,
             null,
             null);
-    return new WebhookClaim(delivery, "https://merchant.example.com/hooks", new byte[] {1, 2, 3});
+    return new WebhookClaim(
+        delivery, "https://merchant.example.com/hooks", new byte[] {1, 2, 3}, 1);
   }
 }

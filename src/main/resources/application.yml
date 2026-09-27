@@ -52,6 +52,8 @@ ledgerx:
   kafka:
     payment-events-topic: ${LEDGERX_KAFKA_PAYMENT_EVENTS_TOPIC:ledgerx.payment-events.v1}
     consumer-enabled: ${LEDGERX_KAFKA_CONSUMER_ENABLED:false}
+    event-retention: ${LEDGERX_KAFKA_EVENT_RETENTION:P14D}
+    dead-letter-retention: ${LEDGERX_KAFKA_DEAD_LETTER_RETENTION:P30D}
   outbox:
     publisher-enabled: ${LEDGERX_OUTBOX_PUBLISHER_ENABLED:false}
     poll-delay: ${LEDGERX_OUTBOX_POLL_DELAY:PT5S}
@@ -65,6 +67,7 @@ ledgerx:
     dispatcher-enabled: ${LEDGERX_WEBHOOK_DISPATCHER_ENABLED:false}
     consumer-group: ${LEDGERX_WEBHOOK_CONSUMER_GROUP:ledgerx-webhook-delivery-enqueuer-v1}
     encryption-key: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY:}
+    encryption-keys: ${LEDGERX_WEBHOOK_ENCRYPTION_KEYS:}
     encryption-key-version: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION:1}
     max-endpoints-per-merchant: ${LEDGERX_WEBHOOK_MAX_ENDPOINTS_PER_MERCHANT:5}
     batch-size: ${LEDGERX_WEBHOOK_BATCH_SIZE:20}
