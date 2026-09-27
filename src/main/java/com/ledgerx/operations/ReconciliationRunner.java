@@ -43,6 +43,7 @@ public class ReconciliationRunner {
       findingCount += recordUnbalancedJournals(runId);
       findingCount += recordPaymentsMissingOutboxEvent(runId);
       findingCount += recordRefundsMissingOutboxEvent(runId);
+      findingCount += recordPaymentsMissingRiskAssessment(runId);
       reconciliationStore.completeRun(runId, findingCount);
     } catch (RuntimeException exception) {
       reconciliationStore.failRun(runId, "RECONCILIATION_FAILURE");
@@ -131,6 +132,39 @@ public class ReconciliationRunner {
                 "REFUND",
                 id,
                 "completed refund is missing its outbox event"));
+    return ids.size();
+  }
+
+  private int recordPaymentsMissingRiskAssessment(UUID runId) {
+    List<UUID> ids =
+        jdbcTemplate.query(
+            """
+            SELECT p.id FROM ledgerx.payments p
+            WHERE EXISTS (
+                SELECT 1 FROM ledgerx.risk_policy_versions policy
+                WHERE policy.enabled = TRUE AND policy.created_at <= p.completed_at
+                  AND NOT EXISTS (
+                    SELECT 1 FROM ledgerx.risk_policy_versions newer
+                    WHERE newer.version_number > policy.version_number
+                      AND newer.created_at <= p.completed_at
+                  )
+            )
+              AND NOT EXISTS (
+                SELECT 1 FROM ledgerx.risk_assessments assessment
+                WHERE assessment.payment_id = p.id AND assessment.outcome = 'ALLOW'
+              )
+            ORDER BY p.completed_at, p.id LIMIT 1000
+            """,
+            (resultSet, rowNumber) -> resultSet.getObject("id", UUID.class));
+    ids.forEach(
+        id ->
+            record(
+                runId,
+                "PAYMENT_RISK_ASSESSMENT_MISSING",
+                "CRITICAL",
+                "PAYMENT",
+                id,
+                "completed payment under enabled policy is missing its risk assessment"));
     return ids.size();
   }
 

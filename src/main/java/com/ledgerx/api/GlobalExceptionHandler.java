@@ -2,12 +2,19 @@ package com.ledgerx.api;
 
 import com.ledgerx.access.OwnerIdentityException;
 import com.ledgerx.ledger.domain.FinancialValidationException;
+import com.ledgerx.ledger.domain.LedgerTransactionNotFoundException;
 import com.ledgerx.ledger.domain.UnknownLedgerAccountException;
+import com.ledgerx.operations.OperationsConflictException;
+import com.ledgerx.operations.OperationsNotFoundException;
+import com.ledgerx.operations.OperationsValidationException;
 import com.ledgerx.payment.domain.PaymentAuthorizationException;
 import com.ledgerx.payment.domain.PaymentIdempotencyKeyReuseException;
 import com.ledgerx.payment.domain.PaymentIdempotencyRequestInProgressException;
 import com.ledgerx.payment.domain.PaymentNotFoundException;
 import com.ledgerx.payment.domain.RefundAuthorizationException;
+import com.ledgerx.risk.RiskConflictException;
+import com.ledgerx.risk.RiskNotFoundException;
+import com.ledgerx.risk.RiskValidationException;
 import com.ledgerx.transfer.domain.IdempotencyKeyReuseException;
 import com.ledgerx.transfer.domain.IdempotencyRequestInProgressException;
 import com.ledgerx.transfer.domain.TransferAuthorizationException;
@@ -73,8 +80,15 @@ public class GlobalExceptionHandler {
   @ExceptionHandler({TransferNotFoundException.class, PaymentNotFoundException.class})
   public ResponseEntity<ApiError> handleFinancialFactNotFound(
       Exception exception, HttpServletRequest request) {
-    String code = isPaymentPath(request) ? "PAYMENT_NOT_FOUND" : "TRANSFER_NOT_FOUND";
-    String message = isPaymentPath(request) ? "payment was not found" : "transfer was not found";
+    boolean refundPath = request.getRequestURI().startsWith("/api/v1/refunds");
+    String code =
+        refundPath
+            ? "REFUND_NOT_FOUND"
+            : isPaymentPath(request) ? "PAYMENT_NOT_FOUND" : "TRANSFER_NOT_FOUND";
+    String message =
+        refundPath
+            ? "refund was not found"
+            : isPaymentPath(request) ? "payment was not found" : "transfer was not found";
     return error(HttpStatus.NOT_FOUND, code, message, request, List.of());
   }
 
@@ -89,6 +103,70 @@ public class GlobalExceptionHandler {
         "webhook resource was not found",
         request,
         List.of());
+  }
+
+  @ExceptionHandler(LedgerTransactionNotFoundException.class)
+  public ResponseEntity<ApiError> handleLedgerNotFound(
+      LedgerTransactionNotFoundException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.NOT_FOUND,
+        "LEDGER_TRANSACTION_NOT_FOUND",
+        "ledger transaction was not found",
+        request,
+        List.of());
+  }
+
+  @ExceptionHandler(OperationsNotFoundException.class)
+  public ResponseEntity<ApiError> handleOperationsNotFound(
+      OperationsNotFoundException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.NOT_FOUND, "OPERATIONS_NOT_FOUND", exception.getMessage(), request, List.of());
+  }
+
+  @ExceptionHandler(RiskNotFoundException.class)
+  public ResponseEntity<ApiError> handleRiskNotFound(
+      RiskNotFoundException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.NOT_FOUND,
+        "RISK_CASE_NOT_FOUND",
+        "risk review case was not found",
+        request,
+        List.of());
+  }
+
+  @ExceptionHandler(RiskConflictException.class)
+  public ResponseEntity<ApiError> handleRiskConflict(
+      RiskConflictException exception, HttpServletRequest request) {
+    return error(HttpStatus.CONFLICT, "RISK_CONFLICT", exception.getMessage(), request, List.of());
+  }
+
+  @ExceptionHandler(RiskValidationException.class)
+  public ResponseEntity<ApiError> handleRiskValidation(
+      RiskValidationException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        "RISK_NOT_PROCESSABLE",
+        exception.getMessage(),
+        request,
+        List.of());
+  }
+
+  @ExceptionHandler(OperationsValidationException.class)
+  public ResponseEntity<ApiError> handleOperationsValidation(
+      OperationsValidationException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        "OPERATIONS_NOT_PROCESSABLE",
+        exception.getMessage(),
+        request,
+        List.of());
+  }
+
+  @ExceptionHandler(OperationsConflictException.class)
+  public ResponseEntity<ApiError> handleOperationsConflict(
+      OperationsConflictException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.CONFLICT, "OPERATIONS_CONFLICT", exception.getMessage(), request, List.of());
   }
 
   @ExceptionHandler(TransferAuthorizationException.class)
@@ -220,6 +298,9 @@ public class GlobalExceptionHandler {
   }
 
   private String financialValidationCode(HttpServletRequest request) {
+    if (request.getRequestURI().startsWith("/api/v1/demo/")) {
+      return "DEMO_FUNDING_NOT_PROCESSABLE";
+    }
     if (request.getRequestURI().contains("/refunds")) {
       return "REFUND_NOT_PROCESSABLE";
     }

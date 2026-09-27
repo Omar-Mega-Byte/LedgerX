@@ -138,6 +138,9 @@ public class LedgerAccount {
   }
 
   public void close(Money balance, Clock clock) {
+    if (status == AccountStatus.CLOSED) {
+      throw new IllegalStateException("closed accounts cannot be closed again");
+    }
     Objects.requireNonNull(balance, "balance must not be null");
     if (balance.currency() != currency) {
       throw new IllegalArgumentException("balance currency must match account currency");

@@ -18,7 +18,13 @@ public class DevelopmentSecurityConfiguration {
   @Bean
   SecurityFilterChain developmentSecurityFilterChain(HttpSecurity http) throws Exception {
     return http.csrf(AbstractHttpConfigurer::disable)
-        .authorizeHttpRequests(authorization -> authorization.anyRequest().permitAll())
+        .authorizeHttpRequests(
+            authorization ->
+                authorization
+                    .requestMatchers("/api/v1/operations/**")
+                    .denyAll()
+                    .anyRequest()
+                    .permitAll())
         .build();
   }
 }

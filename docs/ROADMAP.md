@@ -55,18 +55,25 @@
 
 **Goal:** make asynchronous boundary behavior visible and supportable.
 
-- Webhook registration, HMAC signing, delivery records, and retries
-- Metrics, traces, health checks, and operational dashboards where useful
-- Reconciliation for ledger/payment/balance mismatches
-- Docker and CI refinements based on actual development needs
+- **Complete:** merchant webhook registration, HMAC signing, delivery records, retries, and manual replay
+- **Complete:** bounded outbox/webhook metrics and delivery health details; full tracing and dashboards remain deferred
+- **Complete:** read-only reconciliation of journal balance and payment/refund outbox completeness
+- **Complete:** production Compose/configuration refinements for webhook and reconciliation settings
 
-**Exit criteria:** failed external delivery is observable and recoverable; important integrity mismatches can be detected.
+**Exit criteria:** complete — failed external delivery is observable and recoverable; important integrity mismatches can be detected without automatic financial repair. See [Phase 4](../phase4.md).
 
-## Phase 5 — Selective enhancements
+## Phase 5 — Payment risk decisions and review
 
-**Goal:** add only capabilities that reinforce the project’s financial-engineering story.
+**Goal:** make payer-authorized merchant payments subject to explainable, auditable risk decisions without letting review or operator actions move money.
 
-Candidates include rule-based risk checks, merchant API keys, Redis rate limits, a provider simulator, multi-currency concerns, or deployment work. Each requires a concrete use case and a documented trade-off before it enters active delivery.
+- **Complete:** versioned operator-managed USD rules for a hard amount limit and rolling payer velocity checks
+- **Complete:** durable `ALLOW`, `REVIEW`, and `BLOCK` outcomes integrated with payment idempotency
+- **Complete:** operator review queue and payer-only retry of an approved, exact matching request
+- **Complete:** owner/operator workbench views, audit history, metrics, and reconciliation evidence
+
+**Exit criteria:** complete — a review or block posts no money, an approval alone posts no money, and an approved payer retry can create at most one payment and one completed-payment event. The full CI run passed 34 unit and 63 integration tests on 2026-09-25. See [Phase 5](../Phase5.md).
+
+Merchant API keys, Redis rate limits, provider simulation, payouts, and multi-currency remain candidates for later phases when a concrete use case justifies them.
 
 ## Change policy
 
