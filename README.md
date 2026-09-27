@@ -1,12 +1,11 @@
 # LedgerX
 
-LedgerX is a production-inspired Java backend for payment and digital-wallet workflows. It is being built as a portfolio project that emphasizes financial correctness: auditable money movement, duplicate prevention, safe concurrency, and reliable event processing.
+LedgerX is a production-inspired Java backend for payment and digital-wallet workflows. It emphasizes financial correctness: auditable money movement, duplicate prevention, safe concurrency, and reliable event processing.
 
-> **Project status:** Phases 1–5 are implemented: USD wallet ownership, immutable double-entry
-> journals, idempotent transfers, merchant payments/refunds, transactional outbox/Kafka delivery,
-> and merchant-owned signed webhook delivery with retries, replay, and reconciliation evidence.
-> Production deployment uses Keycloak-signed JWTs and Caddy HTTPS.
-> Phase 5 adds versioned payment risk decisions and operator review; its full PostgreSQL integration suite passed in CI on 2026-09-25.
+The application includes USD wallet ownership, immutable double-entry journals, idempotent
+transfers, merchant payments and refunds, transactional outbox and Kafka delivery, signed merchant
+webhooks, reconciliation evidence, and versioned payment risk decisions with operator review.
+Production deployment uses Keycloak-signed JWTs and Caddy HTTPS.
 
 ## Workbench
 
@@ -18,15 +17,15 @@ Keycloak Authorization Code with PKCE.
 
 The API includes owner-scoped wallet balances, paged activity, refund lookup, and immutable journal
 evidence. Privileged provisioning and reconciliation views require the `ledgerx-operator` realm
-role. The Phase 5 workbench adds payer review status and an operator risk queue. Local development offers an idempotent demo top-up backed by a balanced journal entry;
+role. The workbench includes payer review status and an operator risk queue. Local development
+offers an idempotent demo top-up backed by a balanced journal entry;
 production does not expose that endpoint. The workbench cannot repair ledger entries. See
 [production deployment](docs/production-deployment.md) for browser client setup.
 
 Payment risk starts with a disabled policy. An operator can activate versioned USD amount and
 24-hour velocity rules. `ALLOW` completes through the existing ledger/outbox flow; `REVIEW` and
 `BLOCK` create durable decisions without moving money. An operator approval only permits the
-original payer to retry the exact request and idempotency key. See [Phase 5](Phase5.md) for the
-contract and verification criteria.
+original payer to retry the exact request and idempotency key. See [the architecture notes](docs/architecture.md) for the current flow; the phase documents preserve design and verification history.
 
 The UI uses dependency-free browser modules with JSDoc type checks. Run `npm ci` and
 `npm run check:ui` to check browser code; Maven packages the static files directly.
@@ -45,7 +44,7 @@ The primary design goals are:
 
 ## Stack
 
-- Java 21+, Spring Boot, Maven
+- Java 21, Spring Boot, Maven
 - PostgreSQL, Flyway, Spring Data JPA
 - Spring Security resource server, Keycloak/OIDC, REST APIs, validation, Actuator, OpenAPI
 - Apache Kafka for committed payment and refund events
@@ -57,7 +56,7 @@ See [the architecture notes](docs/architecture.md) and [the development guide](d
 
 ## Financial core
 
-The first slice is an idempotent wallet-to-wallet transfer backed by an immutable double-entry ledger. Payments, refunds, transactional outbox events, and signed merchant webhooks build on that core. The [foundation record](docs/FOUNDATION.md) explains the implementation order and guardrails.
+Transfers, payments, refunds, and local demo funding use the same immutable double-entry ledger. Payment and refund transactions also write outbox events; asynchronous consumers handle audit receipts and signed merchant webhooks. The [foundation record](docs/FOUNDATION.md) preserves the initial design decisions.
 
 ## Repository layout
 
@@ -68,9 +67,7 @@ The first slice is an idempotent wallet-to-wallet transfer backed by an immutabl
 ├── compose.production.yaml # Private dependencies behind Caddy HTTPS
 ├── src/                  # Spring Boot application and tests
 ├── pom.xml               # Maven build and verification configuration
-├── mvnw.cmd              # Pinned Maven Wrapper for Windows
-├── PROJECT_CONTEXT.txt   # Living product and engineering context
-└── TASKS.md              # Sequenced setup and delivery tasks
+└── mvnw.cmd              # Pinned Maven Wrapper for Windows
 ```
 
 The project runs as a modular monolith. PostgreSQL is the financial source of truth and Kafka carries committed payment/refund events.
@@ -101,8 +98,6 @@ For current direction and delivery sequencing, read:
 - [Configuration conventions](docs/configuration.md)
 - [Docker instructions](docs/docker.md)
 - [Development foundation record](docs/FOUNDATION.md)
-- [Living project context](PROJECT_CONTEXT.txt)
-- [Task list](TASKS.md)
 
 ## Non-goals
 
