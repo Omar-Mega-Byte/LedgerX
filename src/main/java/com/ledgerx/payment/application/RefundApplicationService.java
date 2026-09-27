@@ -82,8 +82,7 @@ public class RefundApplicationService {
             .orElseThrow(() -> new PaymentNotFoundException("payment was not found"));
     LedgerAccount merchantWallet = findWallet(payment.merchantWalletAccountId());
     LedgerAccount payerWallet = findWallet(payment.payerWalletAccountId());
-    validateRefundAuthorization(
-        ownerContext, payment, merchantWallet, payerWallet, command.money());
+    validateRefundAuthorization(ownerContext, merchantWallet, payerWallet, command.money());
     validateRemainingAmount(payment, command.money());
 
     UUID refundId = UUID.randomUUID();
@@ -138,7 +137,6 @@ public class RefundApplicationService {
 
   private void validateRefundAuthorization(
       OwnerContext ownerContext,
-      Payment payment,
       LedgerAccount merchantWallet,
       LedgerAccount payerWallet,
       Money money) {
@@ -167,9 +165,7 @@ public class RefundApplicationService {
       throw new PaymentValidationException("refund currency must match the payment currency");
     }
     BigDecimal alreadyRefunded = refundRepository.totalAmountForPayment(payment.id());
-    Money totalAfterRefund =
-        new Money(alreadyRefunded.add(refundMoney.amount()), refundMoney.currency());
-    if (totalAfterRefund.amount().compareTo(payment.money().amount()) > 0) {
+    if (alreadyRefunded.add(refundMoney.amount()).compareTo(payment.money().amount()) > 0) {
       throw new PaymentValidationException("refund amount exceeds the remaining refundable amount");
     }
   }
