@@ -11,7 +11,7 @@ $env:SPRING_PROFILES_ACTIVE = 'local'
 .\mvnw.cmd spring-boot:run
 ```
 
-The initial profiles are intentionally minimal:
+The profiles are:
 
 | Profile | Purpose |
 |---|---|
@@ -59,4 +59,4 @@ network policy for merchant HTTPS destinations are configured.
 
 ## Health endpoint
 
-Actuator exposes the liveness-friendly health endpoint at `GET /actuator/health`. Only `health` and `info` are exposed over HTTP at this stage; additional actuator endpoints require an explicit security and operational decision.
+Actuator exposes `health`, `info`, and `metrics` over HTTP. The production filter chain permits health probes without authentication and limits metrics to operators; owner APIs require authentication and operator APIs require the operator role.

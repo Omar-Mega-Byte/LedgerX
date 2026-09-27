@@ -1,5 +1,6 @@
 package com.ledgerx.reliability;
 
+import com.ledgerx.crypto.Sha256;
 import java.sql.Timestamp;
 import java.time.Clock;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,7 +21,7 @@ public class ProcessedEventStore {
 
   @Transactional
   public boolean record(String consumerName, PaymentEventEnvelope envelope, String payload) {
-    String payloadHash = PayloadHash.sha256(payload);
+    String payloadHash = Sha256.hexUtf8(payload);
     int inserted =
         jdbcTemplate.update(
             """

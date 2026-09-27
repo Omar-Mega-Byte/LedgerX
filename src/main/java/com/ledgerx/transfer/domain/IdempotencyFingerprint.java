@@ -1,9 +1,6 @@
 package com.ledgerx.transfer.domain;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
+import com.ledgerx.crypto.Sha256;
 
 /** SHA-256 of the canonical financial request, scoped separately by the caller owner. */
 public final class IdempotencyFingerprint {
@@ -18,13 +15,6 @@ public final class IdempotencyFingerprint {
             command.destinationWalletAccountId().toString(),
             command.money().amount().toPlainString(),
             command.money().currency().name());
-    try {
-      return HexFormat.of()
-          .formatHex(
-              MessageDigest.getInstance("SHA-256")
-                  .digest(canonicalRequest.getBytes(StandardCharsets.UTF_8)));
-    } catch (NoSuchAlgorithmException exception) {
-      throw new IllegalStateException("SHA-256 must be available", exception);
-    }
+    return Sha256.hexUtf8(canonicalRequest);
   }
 }

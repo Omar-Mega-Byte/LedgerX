@@ -2,6 +2,8 @@ package com.ledgerx.risk;
 
 import com.ledgerx.money.Money;
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -49,17 +51,7 @@ public class PaymentRiskService {
             WHERE a.singleton_id = 1
             FOR SHARE OF a
             """,
-            (rs, row) ->
-                new Policy(
-                    rs.getObject("id", UUID.class),
-                    rs.getLong("version_number"),
-                    rs.getBoolean("enabled"),
-                    rs.getBigDecimal("max_payment_amount"),
-                    rs.getInt("review_payment_count"),
-                    rs.getBigDecimal("review_payment_total"),
-                    rs.getString("actor_subject"),
-                    rs.getString("change_reason"),
-                    rs.getTimestamp("created_at").toInstant()))
+            (rs, row) -> mapPolicy(rs))
         .stream()
         .findFirst()
         .orElseThrow(() -> new IllegalStateException("active risk policy is missing"));
@@ -266,10 +258,7 @@ public class PaymentRiskService {
   public ReviewResolution resolveReview(UUID idempotencyId) {
     ReviewCase review = caseByIdempotency(idempotencyId, true);
     Instant now = clock.instant();
-    boolean expired =
-        (review.status().equals("OPEN") && !now.isBefore(review.openExpiresAt()))
-            || (review.status().equals("APPROVED") && !now.isBefore(review.approvalExpiresAt()));
-    if (expired) {
+    if (isExpired(review, now)) {
       jdbc.update(
           "UPDATE ledgerx.risk_review_cases SET status = 'EXPIRED', updated_at = ? WHERE id = ?",
           Timestamp.from(now),
@@ -350,11 +339,7 @@ public class PaymentRiskService {
   }
 
   private ReviewCase effectiveCase(ReviewCase review) {
-    boolean expired =
-        (review.status().equals("OPEN") && !clock.instant().isBefore(review.openExpiresAt()))
-            || (review.status().equals("APPROVED")
-                && !clock.instant().isBefore(review.approvalExpiresAt()));
-    return expired
+    return isExpired(review, clock.instant())
         ? new ReviewCase(
             review.id(),
             review.assessmentId(),
@@ -363,6 +348,11 @@ public class PaymentRiskService {
             review.approvalExpiresAt(),
             review.paymentId())
         : review;
+  }
+
+  private boolean isExpired(ReviewCase review, Instant now) {
+    return (review.status().equals("OPEN") && !now.isBefore(review.openExpiresAt()))
+        || (review.status().equals("APPROVED") && !now.isBefore(review.approvalExpiresAt()));
   }
 
   @Scheduled(fixedDelayString = "${ledgerx.risk.expiry-poll-delay:PT1M}")
@@ -541,21 +531,24 @@ public class PaymentRiskService {
                    review_payment_total, actor_subject, change_reason, created_at
             FROM ledgerx.risk_policy_versions WHERE command_key = ?
             """,
-            (rs, row) ->
-                new Policy(
-                    rs.getObject("id", UUID.class),
-                    rs.getLong("version_number"),
-                    rs.getBoolean("enabled"),
-                    rs.getBigDecimal("max_payment_amount"),
-                    rs.getInt("review_payment_count"),
-                    rs.getBigDecimal("review_payment_total"),
-                    rs.getString("actor_subject"),
-                    rs.getString("change_reason"),
-                    rs.getTimestamp("created_at").toInstant()),
+            (rs, row) -> mapPolicy(rs),
             commandKey)
         .stream()
         .findFirst()
         .orElse(null);
+  }
+
+  private Policy mapPolicy(ResultSet rs) throws SQLException {
+    return new Policy(
+        rs.getObject("id", UUID.class),
+        rs.getLong("version_number"),
+        rs.getBoolean("enabled"),
+        rs.getBigDecimal("max_payment_amount"),
+        rs.getInt("review_payment_count"),
+        rs.getBigDecimal("review_payment_total"),
+        rs.getString("actor_subject"),
+        rs.getString("change_reason"),
+        rs.getTimestamp("created_at").toInstant());
   }
 
   @Transactional

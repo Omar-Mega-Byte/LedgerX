@@ -1,5 +1,6 @@
 package com.ledgerx.webhook;
 
+import com.ledgerx.crypto.Sha256;
 import com.ledgerx.reliability.PaymentEventEnvelope;
 import com.ledgerx.reliability.PaymentEventType;
 import java.sql.Timestamp;
@@ -45,7 +46,7 @@ public class WebhookDeliveryStore {
         envelope.eventType(),
         envelope.schemaVersion(),
         payload,
-        WebhookPayloadHash.sha256(payload),
+        Sha256.hexUtf8(payload),
         Timestamp.from(now),
         Timestamp.from(now));
   }

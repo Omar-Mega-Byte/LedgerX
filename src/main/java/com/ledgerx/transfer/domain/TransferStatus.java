@@ -1,6 +1,6 @@
 package com.ledgerx.transfer.domain;
 
-/** The only durable transfer lifecycle state in Phase 2. */
+/** Transfers are persisted only after their ledger posting succeeds. */
 public enum TransferStatus {
   COMPLETED
 }

@@ -25,7 +25,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Orchestrates transfer business facts while delegating all ledger posting to Phase 1. */
+/** Orchestrates transfers while delegating all money movement to the shared ledger. */
 @Service
 public class TransferApplicationService {
 
