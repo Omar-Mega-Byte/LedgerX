@@ -37,33 +37,6 @@ public class PaymentIdempotencyStore {
         == 1;
   }
 
-  public Optional<PaymentIdempotencyRecord> find(UUID ownerId, String idempotencyKey) {
-    return jdbcTemplate
-        .query(
-            """
-            SELECT id, owner_id, idempotency_key, request_fingerprint, state, payment_id, created_at,
-                   completed_at
-            FROM ledgerx.payment_idempotency
-            WHERE owner_id = ? AND idempotency_key = ?
-            """,
-            (resultSet, rowNumber) ->
-                new PaymentIdempotencyRecord(
-                    resultSet.getObject("id", UUID.class),
-                    resultSet.getObject("owner_id", UUID.class),
-                    resultSet.getString("idempotency_key"),
-                    resultSet.getString("request_fingerprint"),
-                    PaymentIdempotencyState.valueOf(resultSet.getString("state")),
-                    resultSet.getObject("payment_id", UUID.class),
-                    resultSet.getTimestamp("created_at").toInstant(),
-                    resultSet.getTimestamp("completed_at") == null
-                        ? null
-                        : resultSet.getTimestamp("completed_at").toInstant()),
-            ownerId,
-            idempotencyKey)
-        .stream()
-        .findFirst();
-  }
-
   public Optional<PaymentIdempotencyRecord> lock(UUID ownerId, String idempotencyKey) {
     return jdbcTemplate
         .query(
@@ -92,11 +65,11 @@ public class PaymentIdempotencyStore {
   }
 
   public void review(UUID id) {
-    transition(id, "REVIEW", null, null);
+    transition(id, "REVIEW", null);
   }
 
   public void block(UUID id, Instant at) {
-    transition(id, "BLOCKED", null, at);
+    transition(id, "BLOCKED", at);
   }
 
   public void complete(UUID id, UUID paymentId, Instant completedAt) {
@@ -116,16 +89,15 @@ public class PaymentIdempotencyStore {
     }
   }
 
-  private void transition(UUID id, String state, UUID paymentId, Instant at) {
+  private void transition(UUID id, String state, Instant at) {
     int updated =
         jdbcTemplate.update(
             """
             UPDATE ledgerx.payment_idempotency
-            SET state = ?, payment_id = ?, completed_at = ?
+            SET state = ?, completed_at = ?
             WHERE id = ? AND state IN ('PROCESSING', 'REVIEW')
             """,
             state,
-            paymentId,
             at == null ? null : Timestamp.from(at),
             id);
     if (updated != 1) {

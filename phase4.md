@@ -1,5 +1,7 @@
 # Phase 4 — Signed Webhook Delivery and Operational Integrity
 
+> Historical design and verification record. See [current architecture](docs/architecture.md) for the integrated application.
+
 **Status: implemented and verified on 2026-09-23.**
 
 ## Stabilization record (2026-09-23)
@@ -49,12 +51,8 @@ The implementation audit found the following already present and usable by this 
 | PostgreSQL/Flyway/Testcontainers/MockMvc/Kafka tests | Supplies the schema, failure, concurrency, and API verification approach. |
 | Actuator health probes and containerized deployment | Supplies the narrow operational boundary for health and metrics. |
 
-Two planning discrepancies are resolved deliberately:
-
-- Phase 3 already implemented full and partial refunds, despite an older `PROJECT_CONTEXT.txt` ordering
-  that placed refunds in Phase 4. Refund work is **not** repeated here.
-- `docs/architecture.md` names a Webhooks module before it exists. It must not describe it as current
-  implementation until this phase's code and verification have landed.
+Refunds were already implemented before this phase. This phase added webhooks and reconciliation;
+the current architecture is described in `docs/architecture.md`.
 
 ## 3. Scope
 

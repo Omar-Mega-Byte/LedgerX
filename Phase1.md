@@ -1,5 +1,7 @@
 # Phase 1 — Ledger and Wallet Core
 
+> Historical design and verification record. See [current architecture](docs/architecture.md) for the integrated application.
+
 **Status: implemented and verified on 2026-09-21.**
 
 ## 1. Goal

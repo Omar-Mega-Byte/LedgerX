@@ -55,7 +55,7 @@ Use small, coherent commits with a conventional prefix where practical, for exam
 
 ## Documentation maintenance
 
-Update the README when setup, runnable capabilities, or major project claims change. Update [architecture.md](architecture.md) when a material design decision is made. `PROJECT_CONTEXT.txt` remains the broader living product context; newer explicit requirements take precedence.
+Update the README when setup, runnable capabilities, or major project claims change. Update [architecture.md](architecture.md) when a material design decision is made. Keep proposed work in [the backlog](BACKLOG.md); the phase documents are historical design records.
 
 ## Graphify knowledge graph
 
