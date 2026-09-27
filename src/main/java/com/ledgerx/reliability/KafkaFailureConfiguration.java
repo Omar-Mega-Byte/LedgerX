@@ -1,6 +1,9 @@
 package com.ledgerx.reliability;
 
+import com.ledgerx.operations.OperationalMetrics;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.TopicConfig;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -45,12 +48,21 @@ public class KafkaFailureConfiguration {
 
   @Bean
   CommonErrorHandler paymentEventErrorHandler(
-      KafkaTemplate<String, String> kafkaTemplate, KafkaProperties properties) {
+      KafkaTemplate<String, String> kafkaTemplate,
+      KafkaProperties properties,
+      OperationalMetrics metrics) {
     DeadLetterPublishingRecoverer recoverer =
         new DeadLetterPublishingRecoverer(
             kafkaTemplate,
             (record, exception) ->
-                new TopicPartition(properties.getPaymentEventsTopic() + ".DLT", -1));
+                new TopicPartition(properties.getPaymentEventsTopic() + ".DLT", -1)) {
+          @Override
+          public void accept(
+              ConsumerRecord<?, ?> record, Consumer<?, ?> consumer, Exception exception) {
+            super.accept(record, consumer, exception);
+            metrics.deadLetterPublished();
+          }
+        };
     recoverer.setFailIfSendResultIsError(true);
     DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3L));
     handler.addNotRetryableExceptions(IllegalArgumentException.class);

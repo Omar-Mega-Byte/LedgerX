@@ -1,0 +1,76 @@
+groups:
+  - name: ledgerx-operations
+    rules:
+      - alert: LedgerXUnavailable
+        expr: up{job="ledgerx"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: LedgerX metrics endpoint is unavailable
+      - alert: LedgerXDatabaseUnavailable
+        expr: ledgerx_database_available == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: Financial database probe failed
+      - alert: LedgerXKafkaUnavailable
+        expr: ledgerx_kafka_broker_available == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: Kafka broker probe failed
+      - alert: LedgerXOutboxStalled
+        expr: ledgerx_outbox_stalled > 0 or ledgerx_outbox_oldest_pending_age_seconds > 900
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: Committed events have not progressed through the outbox
+      - alert: LedgerXOutboxRetries
+        expr: increase(ledgerx_outbox_publish_total{result="retry"}[10m]) > 5
+        labels: {severity: warning}
+        annotations:
+          summary: Outbox publisher is repeatedly retrying
+      - alert: LedgerXDeadLetterPublished
+        expr: increase(ledgerx_kafka_dead_letter_publish_total[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: A Kafka record was sent to the dead-letter topic
+      - alert: LedgerXWebhookDead
+        expr: ledgerx_webhook_dead > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Merchant webhook deliveries require triage
+      - alert: LedgerXWebhookStalled
+        expr: ledgerx_webhook_stalled > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Merchant webhook delivery has stalled
+      - alert: LedgerXReconciliationMissingOrStale
+        expr: ledgerx_reconciliation_enabled == 1 and (ledgerx_reconciliation_last_run_age_seconds < 0 or ledgerx_reconciliation_last_run_age_seconds > 5400)
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: No recent reconciliation run is available
+      - alert: LedgerXReconciliationDisabled
+        expr: ledgerx_reconciliation_enabled == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: Scheduled reconciliation is disabled
+      - alert: LedgerXReconciliationFailed
+        expr: ledgerx_reconciliation_last_run_failed > 0
+        labels: {severity: critical}
+        annotations:
+          summary: The latest reconciliation run failed
+      - alert: LedgerXIntegrityFinding
+        expr: ledgerx_reconciliation_last_run_critical_findings > 0
+        labels: {severity: critical}
+        annotations:
+          summary: The latest reconciliation run found critical integrity issues
+      - alert: LedgerXServerErrors
+        expr: sum(increase(http_server_requests_seconds_count{status=~"5.."}[5m])) > 5
+        labels: {severity: warning}
+        annotations:
+          summary: LedgerX has returned repeated server errors

@@ -55,6 +55,7 @@ temp/
 *.p12
 *.pfx
 secrets/
+monitoring/alertmanager.local.yml
 
 # Local Docker Compose overrides
 compose.override.yml

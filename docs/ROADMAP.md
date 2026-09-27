@@ -94,6 +94,22 @@ immutable event; Kafka and PostgreSQL integration tests cover DLT and duplicate 
 [event operations runbook](event-operations.md) documents retention and recovery. Broker retention
 for pre-existing topics and a live recovery drill remain deployment acceptance work.
 
+## Phase 8 — Operational signals and alerting
+
+**Implemented in code:** Prometheus metrics for durable outbox, webhook, database, Kafka, and
+reconciliation states; publisher retry/success and DLT counters; private scrape network and
+public proxy block; Prometheus alert rules; Alertmanager with a configurable HTTPS webhook
+receiver; a provisioned Grafana dashboard; and structured production logs with request IDs.
+Notification delivery and threshold tuning require a
+configured receiver and a live deployment drill.
+
+## Phase 9 — Backup and loss recovery
+
+**Implemented in code:** two-database custom-format backup with hashes and disposable restore
+verification, a recovery runbook, and integration tests for restored financial facts and
+immutable guards plus audited replay into a fresh Kafka broker. An off-host backup schedule,
+full production cutover rehearsal, and measured RPO/RTO remain deployment acceptance work.
+
 ## Change policy
 
 When priorities change, update this roadmap and the backlog together. Do not represent a roadmap item as implemented until the corresponding code, tests, and documentation support the claim.

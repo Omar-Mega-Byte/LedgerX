@@ -17,6 +17,9 @@ server:
   shutdown: graceful
 
 logging:
+  structured:
+    format:
+      console: ecs
   level:
     root: INFO
 
