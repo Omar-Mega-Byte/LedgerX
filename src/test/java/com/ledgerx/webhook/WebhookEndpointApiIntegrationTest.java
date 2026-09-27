@@ -1,6 +1,7 @@
 package com.ledgerx.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,6 +58,9 @@ class WebhookEndpointApiIntegrationTest {
   @Autowired private Clock clock;
   @Autowired private WebhookEndpointStore endpointStore;
   @Autowired private WebhookDeliveryStore deliveryStore;
+  @Autowired private WebhookProperties webhookProperties;
+  @Autowired private WebhookSecretCipher secretCipher;
+  @Autowired private WebhookEncryptionRotationService encryptionRotationService;
 
   private UUID merchantOwnerId;
 
@@ -72,7 +76,7 @@ class WebhookEndpointApiIntegrationTest {
   @BeforeEach
   void clearData() {
     jdbcTemplate.execute(
-        "TRUNCATE TABLE ledgerx.risk_review_actions, ledgerx.risk_review_cases, ledgerx.risk_assessments, ledgerx.demo_fundings, ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
+        "TRUNCATE TABLE ledgerx.webhook_secret_reencryptions, ledgerx.outbox_replay_requests, ledgerx.risk_review_actions, ledgerx.risk_review_cases, ledgerx.risk_assessments, ledgerx.demo_fundings, ledgerx.reconciliation_findings, ledgerx.reconciliation_runs, "
             + "ledgerx.webhook_delivery_attempts, ledgerx.webhook_deliveries, "
             + "ledgerx.webhook_endpoint_idempotency, ledgerx.webhook_endpoints, "
             + "ledgerx.processed_events, ledgerx.outbox_events, ledgerx.refund_idempotency, "
@@ -211,6 +215,64 @@ class WebhookEndpointApiIntegrationTest {
                     String.class)
                 .getStatusCode())
         .isEqualTo(HttpStatus.CONFLICT);
+  }
+
+  @Test
+  void reencryptsStoredSecretsWithoutChangingMerchantSigningMaterial() throws Exception {
+    assertThat(
+            create(
+                    request("https://merchant.example.com/hooks", SIGNING_SECRET),
+                    ownerHeaders("register-for-reencryption"))
+                .getStatusCode())
+        .isEqualTo(HttpStatus.CREATED);
+    byte[] newKeyBytes = new byte[32];
+    Arrays.fill(newKeyBytes, (byte) 9);
+    webhookProperties.setEncryptionKeys(
+        "1="
+            + Base64.getEncoder().encodeToString(new byte[32])
+            + ",2="
+            + Base64.getEncoder().encodeToString(newKeyBytes));
+    webhookProperties.setEncryptionKeyVersion(2);
+    try {
+      assertThat(encryptionRotationService.reencryptBatch(10, "operator")).isEqualTo(1);
+      assertThat(encryptionRotationService.reencryptBatch(10, "operator")).isZero();
+      assertThat(count("ledgerx.webhook_secret_reencryptions")).isEqualTo(1);
+      assertThat(
+              jdbcTemplate.queryForObject(
+                  "SELECT secret_key_version FROM ledgerx.webhook_endpoints", Integer.class))
+          .isEqualTo(2);
+      assertThat(
+              secretCipher.decrypt(
+                  jdbcTemplate.queryForObject(
+                      "SELECT secret_ciphertext FROM ledgerx.webhook_endpoints", byte[].class),
+                  2))
+          .isEqualTo(SIGNING_SECRET);
+    } finally {
+      webhookProperties.setEncryptionKeyVersion(1);
+      webhookProperties.setEncryptionKeys("");
+    }
+  }
+
+  @Test
+  void dispatcherStartupCheckRejectsIncorrectStoredEncryptionKey() {
+    assertThat(
+            create(
+                    request("https://merchant.example.com/hooks", SIGNING_SECRET),
+                    ownerHeaders("register-for-key-check"))
+                .getStatusCode())
+        .isEqualTo(HttpStatus.CREATED);
+    byte[] wrongKey = new byte[32];
+    Arrays.fill(wrongKey, (byte) 7);
+    webhookProperties.setEncryptionKeys("1=" + Base64.getEncoder().encodeToString(wrongKey));
+    try {
+      assertThatThrownBy(
+              () ->
+                  new WebhookKeyAvailabilityCheck(jdbcTemplate, secretCipher)
+                      .verifyStoredKeyVersions())
+          .isInstanceOf(IllegalStateException.class);
+    } finally {
+      webhookProperties.setEncryptionKeys("");
+    }
   }
 
   @Test

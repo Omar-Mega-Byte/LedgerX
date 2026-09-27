@@ -38,6 +38,9 @@ public class WebhookUrlPolicy {
       if (uri.getRawQuery() != null) {
         throw new WebhookValidationException("webhook URL cannot contain a query string");
       }
+      if (!properties.isAllowHttp() && uri.getPort() != -1 && uri.getPort() != 443) {
+        throw new WebhookValidationException("webhook URL must use the standard HTTPS port");
+      }
       rejectUnsafeHost(uri.getHost());
       return new URI(
               scheme.toLowerCase(Locale.ROOT),
@@ -74,11 +77,7 @@ public class WebhookUrlPolicy {
     try {
       String literal = host.startsWith("[") ? host.substring(1, host.length() - 1) : host;
       InetAddress address = InetAddress.getByName(literal);
-      return address.isAnyLocalAddress()
-          || address.isLoopbackAddress()
-          || address.isLinkLocalAddress()
-          || address.isSiteLocalAddress()
-          || address.isMulticastAddress();
+      return WebhookAddressPolicy.isForbidden(address);
     } catch (Exception exception) {
       throw new WebhookValidationException("webhook URL host is invalid");
     }

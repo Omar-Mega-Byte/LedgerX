@@ -1,6 +1,7 @@
 package com.ledgerx.reliability;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import com.ledgerx.access.OwnerContext;
@@ -27,9 +28,12 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -74,6 +78,7 @@ class KafkaOutboxIntegrationTest {
   @Autowired private PaymentApplicationService paymentApplicationService;
   @Autowired private WebhookEndpointApplicationService webhookEndpointService;
   @Autowired private OutboxPublisher outboxPublisher;
+  @Autowired private OutboxReplayService outboxReplayService;
   @Autowired private KafkaTemplate<String, String> kafkaTemplate;
   @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -144,6 +149,85 @@ class KafkaOutboxIntegrationTest {
     assertThat(publicPayload)
         .contains(payment.payment().id().toString())
         .doesNotContain("payerWalletId", "merchantWalletId", "ledgerTransactionId");
+
+    UUID eventId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM ledgerx.outbox_events WHERE aggregate_id = ?",
+            UUID.class,
+            payment.payment().id());
+    OutboxReplayService.ReplayRequest replay =
+        outboxReplayService.requestReplay(
+            eventId, "broker-recovery-1", "Kafka loss drill", "operator");
+    assertThat(replay.replayed()).isFalse();
+    assertThat(
+            outboxReplayService
+                .requestReplay(eventId, "broker-recovery-1", "Kafka loss drill", "operator")
+                .replayed())
+        .isTrue();
+    assertThatThrownBy(
+            () ->
+                outboxReplayService.requestReplay(
+                    eventId, "broker-recovery-1", "different reason", "operator"))
+        .isInstanceOf(com.ledgerx.operations.OperationsConflictException.class);
+    assertThatThrownBy(
+            () ->
+                outboxReplayService.requestReplay(
+                    eventId, "broker-recovery-2", "second replay", "operator"))
+        .isInstanceOf(com.ledgerx.operations.OperationsConflictException.class);
+    outboxPublisher.publishAvailable();
+    awaitProcessedEvent(payment.payment().id(), 2);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT replay_count FROM ledgerx.outbox_events WHERE id = ?",
+                Integer.class,
+                eventId))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ledgerx.outbox_replay_requests WHERE event_id = ?",
+                Integer.class,
+                eventId))
+        .isEqualTo(1);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ledgerx.webhook_deliveries WHERE aggregate_id = ?",
+                Integer.class,
+                payment.payment().id()))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void malformedEventIsDeadLetteredAndDoesNotStallTheConsumerGroups() throws Exception {
+    String malformed = "{not-valid-json";
+    RecordMetadata metadata =
+        kafkaTemplate
+            .send("ledgerx.payment-events.v1", "invalid-event", malformed)
+            .get(5, TimeUnit.SECONDS)
+            .getRecordMetadata();
+
+    awaitConsumerOffsetPast(metadata, "ledgerx-payment-event-audit-v1");
+    awaitConsumerOffsetPast(metadata, "ledgerx-webhook-delivery-enqueuer-v1");
+    try (KafkaConsumer<String, String> consumer =
+        new KafkaConsumer<>(
+            Map.of(
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                KAFKA.getBootstrapServers(),
+                ConsumerConfig.GROUP_ID_CONFIG,
+                "ledgerx-dlt-test-" + UUID.randomUUID(),
+                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                StringDeserializer.class,
+                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                StringDeserializer.class))) {
+      TopicPartition partition = new TopicPartition("ledgerx.payment-events.v1.DLT", 0);
+      consumer.assign(List.of(partition));
+      consumer.seekToBeginning(List.of(partition));
+      await()
+          .atMost(Duration.ofSeconds(10))
+          .untilAsserted(
+              () ->
+                  assertThat(consumer.poll(Duration.ofMillis(300)).records(partition))
+                      .anySatisfy(record -> assertThat(record.value()).isEqualTo(malformed)));
+    }
   }
 
   private void awaitProcessedEvent(UUID paymentId, int expectedCount) {

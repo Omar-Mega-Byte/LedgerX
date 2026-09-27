@@ -75,6 +75,25 @@
 
 Merchant API keys, Redis rate limits, provider simulation, payouts, and multi-currency remain candidates for later phases when a concrete use case justifies them.
 
+## Phase 6 — Public and outbound security
+
+**Implemented in code:** webhook URL and connection-time DNS guards, HTTPS port 443 enforcement,
+non-redirecting outbound client, encryption key-ring rotation with durable operator evidence,
+JWT mutation rate limiting, browser security headers, and hardened production container/network
+defaults. Unit and PostgreSQL-backed authorization/rotation tests cover these changes. Production
+egress rules, secret-store integration, image/dependency scans, and a live Keycloak/Caddy security
+check remain deployment acceptance work.
+
+## Phase 7 — Integrity evidence and event recovery
+
+**Implemented in code:** reconciliation check version 3 adds ledger, payment/refund, event-stream,
+consumer-receipt, and webhook consistency checks; finding queries are paged, findings API is
+bounded, and failed runs persist a failed status. Kafka consumer failures go to a dead-letter topic
+after bounded retries. Operator outbox replay is idempotent, audited, and republishes the existing
+immutable event; Kafka and PostgreSQL integration tests cover DLT and duplicate safety. The
+[event operations runbook](event-operations.md) documents retention and recovery. Broker retention
+for pre-existing topics and a live recovery drill remain deployment acceptance work.
+
 ## Change policy
 
 When priorities change, update this roadmap and the backlog together. Do not represent a roadmap item as implemented until the corresponding code, tests, and documentation support the claim.

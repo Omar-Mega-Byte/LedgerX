@@ -10,6 +10,7 @@ public class WebhookProperties {
   private boolean dispatcherEnabled;
   private String consumerGroup = "ledgerx-webhook-delivery-enqueuer-v1";
   private String encryptionKey = "";
+  private String encryptionKeys = "";
   private int encryptionKeyVersion = 1;
   private int maxEndpointsPerMerchant = 5;
   private int batchSize = 20;
@@ -53,6 +54,14 @@ public class WebhookProperties {
 
   public void setEncryptionKey(String encryptionKey) {
     this.encryptionKey = encryptionKey;
+  }
+
+  public String getEncryptionKeys() {
+    return encryptionKeys;
+  }
+
+  public void setEncryptionKeys(String encryptionKeys) {
+    this.encryptionKeys = encryptionKeys;
   }
 
   public int getEncryptionKeyVersion() {

@@ -19,7 +19,7 @@ The current modules are:
 | Payment risk | Versioned operator policy, durable payment assessments, bounded review cases, and payer-only approved retries; disabled by default |
 | Reliability | Payment/refund idempotency records, outbox events, publisher leases, and consumer deduplication |
 | Webhooks | Merchant-owned HMAC-signed payment/refund delivery, encrypted signing secrets, leased retries, replay, and redacted delivery audit history |
-| Operations | Read-only reconciliation evidence plus bounded webhook delivery metrics and health details |
+| Operations | Read-only paged reconciliation evidence, audited event replay and webhook key rotation, plus bounded delivery metrics and health details |
 
 Payment risk checks run in the payment transaction before ledger posting. Enabled policies use
 a payer-scoped PostgreSQL advisory transaction lock to serialize rolling-window decisions; this
@@ -87,6 +87,6 @@ The following need evidence from real use cases before being fixed:
 - Redis usage and cache authority;
 - end-user application clients and onboarding flows (Keycloak is the deployed identity provider).
 - payment-provider authorization, capture, fees, settlement, chargebacks, and FX;
-- event retention and dead-letter operations policy.
+- multi-broker Kafka and multi-host recovery topology.
 
 Architecture changes that alter these assumptions should update this document and include tests for the affected failure mode.

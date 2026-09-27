@@ -1,6 +1,7 @@
 services:
   kafka:
     image: apache/kafka:3.9.1
+    restart: unless-stopped
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -13,15 +14,21 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 20s
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - events
 
   postgres:
     image: postgres:17.11-alpine3.24
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${LEDGERX_DB_NAME}
       POSTGRES_USER: ${LEDGERX_DB_USERNAME}
@@ -34,9 +41,12 @@ services:
       start_period: 5s
     volumes:
       - ledgerx-postgres-data:/var/lib/postgresql/data
+    networks:
+      - data
 
   keycloak-postgres:
     image: postgres:17.11-alpine3.24
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${KEYCLOAK_DB_NAME}
       POSTGRES_USER: ${KEYCLOAK_DB_USERNAME}
@@ -49,11 +59,22 @@ services:
       start_period: 5s
     volumes:
       - keycloak-postgres-data:/var/lib/postgresql/data
+    networks:
+      - identity
 
   ledgerx:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m
     environment:
       SPRING_PROFILES_ACTIVE: prod
       LEDGERX_DB_URL: jdbc:postgresql://postgres:5432/${LEDGERX_DB_NAME}
@@ -61,10 +82,13 @@ services:
       LEDGERX_DB_PASSWORD: ${LEDGERX_DB_PASSWORD}
       LEDGERX_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       LEDGERX_KAFKA_PAYMENT_EVENTS_TOPIC: ${LEDGERX_KAFKA_PAYMENT_EVENTS_TOPIC}
+      LEDGERX_KAFKA_EVENT_RETENTION: ${LEDGERX_KAFKA_EVENT_RETENTION:-P14D}
+      LEDGERX_KAFKA_DEAD_LETTER_RETENTION: ${LEDGERX_KAFKA_DEAD_LETTER_RETENTION:-P30D}
       LEDGERX_KAFKA_CONSUMER_ENABLED: ${LEDGERX_KAFKA_CONSUMER_ENABLED}
       LEDGERX_OUTBOX_PUBLISHER_ENABLED: ${LEDGERX_OUTBOX_PUBLISHER_ENABLED}
       LEDGERX_OIDC_ISSUER_URI: ${LEDGERX_OIDC_ISSUER_URI}
       LEDGERX_OIDC_API_CLIENT_ID: ${LEDGERX_OIDC_API_CLIENT_ID}
+      LEDGERX_SECURITY_MUTATION_LIMIT_PER_MINUTE: ${LEDGERX_SECURITY_MUTATION_LIMIT_PER_MINUTE:-120}
       LEDGERX_WEB_CLIENT_ID: ${LEDGERX_WEB_CLIENT_ID:-ledgerx-web}
       LEDGERX_OUTBOX_POLL_DELAY: ${LEDGERX_OUTBOX_POLL_DELAY}
       LEDGERX_OUTBOX_LEASE_DURATION: ${LEDGERX_OUTBOX_LEASE_DURATION}
@@ -74,7 +98,8 @@ services:
       LEDGERX_OUTBOX_RETRY_MAX_DELAY: ${LEDGERX_OUTBOX_RETRY_MAX_DELAY}
       LEDGERX_WEBHOOK_CONSUMER_ENABLED: ${LEDGERX_WEBHOOK_CONSUMER_ENABLED}
       LEDGERX_WEBHOOK_DISPATCHER_ENABLED: ${LEDGERX_WEBHOOK_DISPATCHER_ENABLED}
-      LEDGERX_WEBHOOK_ENCRYPTION_KEY: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY}
+      LEDGERX_WEBHOOK_ENCRYPTION_KEY: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY:-}
+      LEDGERX_WEBHOOK_ENCRYPTION_KEYS: ${LEDGERX_WEBHOOK_ENCRYPTION_KEYS:-}
       LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION}
       LEDGERX_WEBHOOK_MAX_ENDPOINTS_PER_MERCHANT: ${LEDGERX_WEBHOOK_MAX_ENDPOINTS_PER_MERCHANT}
       LEDGERX_WEBHOOK_MAX_ATTEMPTS: ${LEDGERX_WEBHOOK_MAX_ATTEMPTS}
@@ -90,9 +115,14 @@ services:
       timeout: 3s
       retries: 12
       start_period: 30s
+    networks:
+      - edge
+      - data
+      - events
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.4
+    restart: unless-stopped
     command: ["start", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
@@ -111,9 +141,13 @@ services:
         condition: service_healthy
     volumes:
       - ./keycloak/realm:/opt/keycloak/data/import:ro
+    networks:
+      - edge
+      - identity
 
   caddy:
     image: caddy:2.11.4-alpine
+    restart: unless-stopped
     environment:
       CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL}
       LEDGERX_PUBLIC_DOMAIN: ${LEDGERX_PUBLIC_DOMAIN}
@@ -130,9 +164,21 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+    networks:
+      - edge
 
 volumes:
   caddy-data:
   caddy-config:
   keycloak-postgres-data:
   ledgerx-postgres-data:
+  kafka-data:
+
+networks:
+  edge:
+  data:
+    internal: true
+  events:
+    internal: true
+  identity:
+    internal: true
