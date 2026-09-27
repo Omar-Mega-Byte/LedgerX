@@ -1,5 +1,7 @@
 # Phase 5 — Payment Risk Decisions and Review
 
+> Historical design and verification record. See [current architecture](docs/architecture.md) for the integrated application.
+
 **Status: implemented and verified in CI on 2026-09-25.** The final verification ran 34 unit and 63 PostgreSQL/Testcontainers integration tests with no failures; `npm run check:ui` passed. Phase 4 was verified on 2026-09-23. The browser workbench, owner activity, operator APIs, and local demo funding were present in the working tree when Phase 5 began.
 
 ## 1. Goal

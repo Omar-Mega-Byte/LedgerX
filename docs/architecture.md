@@ -21,13 +21,13 @@ The current modules are:
 | Webhooks | Merchant-owned HMAC-signed payment/refund delivery, encrypted signing secrets, leased retries, replay, and redacted delivery audit history |
 | Operations | Read-only reconciliation evidence plus bounded webhook delivery metrics and health details |
 
-Phase 5 risk checks run in the payment transaction before ledger posting. Enabled policies use
+Payment risk checks run in the payment transaction before ledger posting. Enabled policies use
 a payer-scoped PostgreSQL advisory transaction lock to serialize rolling-window decisions; this
 does not reverse the ledger's account-then-owner row-lock order. An allowed payment, assessment,
 journal, idempotency completion, and outbox event commit together. Review and block outcomes
 persist with no payment, journal, or event. Operator approval records an action but cannot
 create a payment; the original payer must retry the same command and key. The initial policy is
-disabled so deployments retain Phase 4 behavior until an operator activates rules.
+disabled so payments are not risk-gated until an operator activates rules.
 
 These are organization boundaries, not separate deployables at this stage.
 

@@ -1,11 +1,13 @@
 # Phase 2 — Idempotent Wallet Transfers API
 
+> Historical design and verification record. See [current architecture](docs/architecture.md) for the integrated application.
+
 **Status: implemented and verified.**
 
 Phase 2 is delivered on `codex/phase-2-transfer-design`: V4/V5 migrations, the atomic transfer
 application service, idempotency replay, the development-only HTTP ownership seam, and focused
-unit/PostgreSQL/MockMvc coverage are all present. The Phase 2 security warning remains in force:
-`X-LedgerX-Owner-Id` is forgeable and is not suitable for public deployment.
+unit/PostgreSQL/MockMvc coverage are all present. `X-LedgerX-Owner-Id` remains forgeable and is
+available only outside the production profile; production resolves ownership from signed JWT claims.
 
 ## 1. Goal
 
@@ -24,11 +26,8 @@ Phase 1 is the implementation truth:
 - WalletAccountService creates internal owner, wallet, and system accounts but exposes no HTTP surface.
 - PostgreSQL Testcontainers tests prove balance, rollback, immutability, lifecycle, and competing-debit behavior.
 
-### Documentation discrepancies
-
-Several older documents still describe Phase 1 as future work: README says financial features are not implemented, architecture.md says no domain model exists, and the roadmap does not mark Phase 1 complete. Phase1.md and source code correctly record Phase 1 as implemented. The Phase 1 component table also names LedgerBalanceRepository, while the implementation uses LedgerEntryRepository for balance aggregation. This session changes only Phase2.md; reconcile those documents when implementation work next updates project claims.
-
-The Phase 0 foundation says authentication precedes exposing transfers, while the roadmap makes idempotent transfers the Phase 2 objective and does not schedule an authentication mechanism. The explicit Phase 2 decision below is a temporary, clearly non-secure owner header boundary rather than prematurely adding JWT or Spring Security.
+The original transfer design used a development owner header. Production requests now use signed JWT
+owner claims; the header remains available only outside the production profile.
 
 ## 3. Scope
 
