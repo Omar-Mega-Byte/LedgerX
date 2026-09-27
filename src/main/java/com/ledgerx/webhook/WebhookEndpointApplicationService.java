@@ -1,6 +1,7 @@
 package com.ledgerx.webhook;
 
 import com.ledgerx.access.OwnerContext;
+import com.ledgerx.crypto.Sha256;
 import com.ledgerx.reliability.PaymentEventType;
 import com.ledgerx.wallet.domain.OwnerType;
 import com.ledgerx.wallet.domain.WalletOwner;
@@ -220,7 +221,7 @@ public class WebhookEndpointApplicationService {
     if (signingSecret == null) {
       throw new WebhookValidationException("webhook signing secret is required");
     }
-    return WebhookPayloadHash.sha256(
+    return Sha256.hexUtf8(
         normalizedUrl + "\n" + WebhookEndpoint.encodeEventTypes(eventTypes) + "\n" + signingSecret);
   }
 }

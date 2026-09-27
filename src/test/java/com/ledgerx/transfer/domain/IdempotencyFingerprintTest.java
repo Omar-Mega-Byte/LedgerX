@@ -43,6 +43,18 @@ class IdempotencyFingerprintTest {
   }
 
   @Test
+  void persistedTransferFingerprintFormatRemainsStable() {
+    TransferCommand command =
+        command(
+            UUID.fromString("11111111-1111-1111-1111-111111111111"),
+            UUID.fromString("22222222-2222-2222-2222-222222222222"),
+            new BigDecimal("10.00"));
+
+    assertThat(IdempotencyFingerprint.forCommand(command))
+        .isEqualTo("4680e447bed9a8d25483ae57ef9daa1ed769fee6e8fd136ec1f437e2be85cd4e");
+  }
+
+  @Test
   void transferFactsRejectZeroAmountsAndTheSameWallet() {
     UUID walletId = UUID.randomUUID();
 
