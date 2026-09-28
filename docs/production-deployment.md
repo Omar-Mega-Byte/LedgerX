@@ -15,7 +15,12 @@ and Keycloak remain on private Docker networks.
    the environment file and use the deployment secret store where available. Create a private
    Grafana admin password file at `GRAFANA_ADMIN_PASSWORD_FILE` before validating Compose.
    Grafana reads it as a Docker secret; keep it off version control and preserve it with the
-   other deployment secrets.
+   other deployment secrets. For the default path, run `./scripts/ensure-grafana-secret.ps1`
+   before starting Compose. The script creates a random password only when the file is absent
+   and never prints its value. If `GRAFANA_ADMIN_PASSWORD_FILE` specifies another path, pass
+   that path to the script with `-Path`. If Grafana already initialized its data volume before
+   the secret existed, creating the file does not change its persisted admin password; reset
+   that account from the mounted secret before using the UI.
 2. Register separate public DNS names for the LedgerX API and Keycloak. Set
    `LEDGERX_PUBLIC_DOMAIN` and `KEYCLOAK_PUBLIC_DOMAIN`; both names must resolve to the server's
    public IP address.
@@ -46,10 +51,19 @@ From the repository root, validate the resolved production configuration, build 
 and start the stack:
 
 ```powershell
+./scripts/ensure-grafana-secret.ps1
 docker compose --env-file .env -f compose.production.yaml config --quiet
 docker compose --env-file .env -f compose.production.yaml up -d --build
 docker compose --env-file .env -f compose.production.yaml ps
 ```
+
+Use `docker compose -p ledgerx-dev -f compose.yaml` for a separate local stack. Do not use
+`--remove-orphans` across the two Compose files under one project name: that can stop the other
+stack. Only the local app publishes port 8080; the public stack serves health through Caddy HTTPS.
+If Caddy cannot obtain a certificate, inspect its logs and verify that both public DNS names
+point to the router's current public IPv4 address and inbound TCP 80/443 actually reach this host
+through the router and firewall. Refresh stale dynamic-DNS records; if the router's WAN address
+does not match its public-facing address, investigate carrier-grade NAT before changing host rules.
 
 The `caddy` service is the only container with externally bound host ports. Caddy automatically obtains and renews
 HTTPS certificates and proxies `LEDGERX_PUBLIC_DOMAIN` to `ledgerx:8080` and
@@ -117,7 +131,9 @@ Treat failed reconciliation runs, stale outbox events, missing consumer receipts
 deliveries as incident signals. The reconciliation job is read-only and leaves immutable findings;
 it does not repair a financial discrepancy.
 Prometheus, Alertmanager, and Grafana run on a private monitoring network and bind their UIs to
-host loopback only. The public proxy blocks `/actuator/prometheus`. Configure an alert receiver and
+host loopback only. Prometheus and Grafana also attach to a separate bridge network so Docker can
+publish their loopback ports; this grants those two containers outbound network access, so maintain
+normal host egress controls. The public proxy blocks `/actuator/prometheus`. Configure an alert receiver and
 exercise it before relying on notifications. See [disaster recovery](disaster-recovery.md) for
 backup, isolated restore, and Kafka-loss procedures.
 
