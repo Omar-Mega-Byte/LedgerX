@@ -1,7 +1,10 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Destination,
-    [string]$EnvFile = '.env'
+    [string]$EnvFile = '.env',
+    [string]$Remote,
+    [switch]$DownloadVerify,
+    [switch]$ApplyRetention
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,4 +60,11 @@ $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -En
 if ($LASTEXITCODE -ne 0) { throw 'Disposable restore verification failed.' }
 $manifest['verified_at_utc'] = (Get-Date).ToUniversalTime().ToString('o')
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding utf8
-Write-Output "Verified backup: $backupDirectory"
+Write-Output "Verified local backup: $backupDirectory"
+try {
+    & (Join-Path $PSScriptRoot 'replicate-backup.ps1') -BackupDirectory $backupDirectory `
+        -EnvFile $environmentFile -Remote $Remote -DownloadVerify:$DownloadVerify `
+        -ApplyRetention:$ApplyRetention
+} catch {
+    throw "Off-host replication failed; verified local backup preserved at $backupDirectory. $($_.Exception.Message)"
+}

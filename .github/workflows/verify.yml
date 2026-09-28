@@ -8,6 +8,14 @@ permissions:
   contents: read
 
 jobs:
+  backup-scripts:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test backup configuration, retention, and failed upload
+        shell: pwsh
+        run: ./scripts/tests/backup-offhost.Tests.ps1
+
   verify:
     runs-on: ubuntu-latest
     steps:
