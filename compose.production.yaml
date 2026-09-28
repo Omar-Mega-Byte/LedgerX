@@ -96,14 +96,14 @@ services:
       LEDGERX_OUTBOX_BATCH_SIZE: ${LEDGERX_OUTBOX_BATCH_SIZE}
       LEDGERX_OUTBOX_RETRY_BASE_DELAY: ${LEDGERX_OUTBOX_RETRY_BASE_DELAY}
       LEDGERX_OUTBOX_RETRY_MAX_DELAY: ${LEDGERX_OUTBOX_RETRY_MAX_DELAY}
-      LEDGERX_WEBHOOK_CONSUMER_ENABLED: ${LEDGERX_WEBHOOK_CONSUMER_ENABLED}
-      LEDGERX_WEBHOOK_DISPATCHER_ENABLED: ${LEDGERX_WEBHOOK_DISPATCHER_ENABLED}
+      LEDGERX_WEBHOOK_CONSUMER_ENABLED: ${LEDGERX_WEBHOOK_CONSUMER_ENABLED:-false}
+      LEDGERX_WEBHOOK_DISPATCHER_ENABLED: ${LEDGERX_WEBHOOK_DISPATCHER_ENABLED:-false}
       LEDGERX_WEBHOOK_ENCRYPTION_KEY: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY:-}
       LEDGERX_WEBHOOK_ENCRYPTION_KEYS: ${LEDGERX_WEBHOOK_ENCRYPTION_KEYS:-}
-      LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION}
-      LEDGERX_WEBHOOK_MAX_ENDPOINTS_PER_MERCHANT: ${LEDGERX_WEBHOOK_MAX_ENDPOINTS_PER_MERCHANT}
-      LEDGERX_WEBHOOK_MAX_ATTEMPTS: ${LEDGERX_WEBHOOK_MAX_ATTEMPTS}
-      LEDGERX_RECONCILIATION_ENABLED: ${LEDGERX_RECONCILIATION_ENABLED}
+      LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION: ${LEDGERX_WEBHOOK_ENCRYPTION_KEY_VERSION:-1}
+      LEDGERX_WEBHOOK_MAX_ENDPOINTS_PER_MERCHANT: ${LEDGERX_WEBHOOK_MAX_ENDPOINTS_PER_MERCHANT:-5}
+      LEDGERX_WEBHOOK_MAX_ATTEMPTS: ${LEDGERX_WEBHOOK_MAX_ATTEMPTS:-8}
+      LEDGERX_RECONCILIATION_ENABLED: ${LEDGERX_RECONCILIATION_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,6 +139,7 @@ services:
         condition: service_healthy
     networks:
       - monitoring
+      - monitoring-host
 
   alertmanager:
     image: prom/alertmanager:v0.34.1
@@ -175,6 +176,7 @@ services:
       - prometheus
     networks:
       - monitoring
+      - monitoring-host
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.4
@@ -247,4 +249,7 @@ networks:
     internal: true
   monitoring:
     internal: true
+  # Docker does not publish host ports from containers attached only to internal networks.
+  # These UIs remain bound to 127.0.0.1 in their service port mappings.
+  monitoring-host:
   notification-egress:
