@@ -56,6 +56,9 @@ temp/
 *.pfx
 secrets/
 monitoring/alertmanager.local.yml
+backups/
+*.dump
+rclone.conf
 
 # Local Docker Compose overrides
 compose.override.yml

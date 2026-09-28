@@ -37,7 +37,7 @@
 | SEC-02 | P1 | **Implemented, deployment validation pending** — guard merchant webhook egress, rotate encrypted secrets, limit authenticated mutations, and harden public proxy/container defaults | DNS rebinding and local destinations are blocked at connection time; operator-only rotation has immutable evidence; verify host egress, secret storage, and live proxy headers before enabling workers |
 | REC-02 | P1 | **Implemented, recovery drill pending** — broaden reconciliation and preserve failed-run evidence | Ledger, payment/refund, outbox, receipt, and webhook findings are bounded and read-only; exercise a live incident drill |
 | REL-03 | P1 | **Implemented, broker validation pending** — dead-letter consumer failures and support audited outbox replay | Poison events reach DLT, replay preserves the immutable event and consumer deduplication; verify retention on the deployed broker |
-| DR-01 | P1 | **Implemented, deployment rehearsal pending** — archive both databases and verify restores in isolation; replay immutable events into a fresh broker | Schedule off-host backups and measure full production restore, cutover, and broker-loss recovery |
+| DR-01 | P1 | **Off-host copy and isolated restore verified; deployment rehearsal pending** — archive both databases, replicate to Google Drive, and verify a downloaded restore; replay immutable events into a fresh broker | Schedule unattended backups and measure full production restore, cutover, and broker-loss recovery |
 | EXT-01 | P3 | Evaluate external-provider simulation, Kubernetes, or multi-currency conversion | Added only with a specific scenario and documented trade-off |
 
 ## Working rules
