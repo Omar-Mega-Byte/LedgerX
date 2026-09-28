@@ -8,8 +8,10 @@ single-host Compose deployment; a multi-host failover design is separate work.
 
 ## Back up and verify
 
-Keep a private, encrypted destination outside the repository and outside the Docker host when
-possible. Restrict access to `.env`, the destination, and the webhook encryption key ring.
+Keep the local destination outside the repository and restrict access to `.env`, local backups,
+the rclone configuration, and the webhook encryption key ring. The `gdrive` rclone remote stores
+the second copy in `gdrive:LedgerX-Backups`. Google Drive is an off-host copy; use a separate
+rclone crypt remote if client-side encryption is required by your data policy.
 Preserve the webhook keys, OIDC configuration, Caddy certificate state, and any Keycloak custom
 files separately; the database archives do not include them. A lost webhook key can make restored
 merchant signing secrets unusable.
@@ -19,25 +21,80 @@ is transactionally consistent within one database, but the two dumps are not one
 From the deployment host, run:
 
 ```powershell
-New-Item -ItemType Directory -Path D:\LedgerXBackups -Force | Out-Null
-.\scripts\backup-production.ps1 -Destination D:\LedgerXBackups -EnvFile .env
+New-Item -ItemType Directory -Path C:\LedgerXBackups -Force | Out-Null
+.\scripts\backup-production.ps1 -Destination C:\LedgerXBackups -EnvFile .env -ApplyRetention
 ```
 
-The script creates custom-format archives for both PostgreSQL services, checks that each archive
-can be listed, writes SHA-256 hashes, and restores both archives into fresh, network-isolated
-temporary containers. It checks LedgerX migration history and financial tables and Keycloak's
-realm table. A failed step exits nonzero; retain failed archives for investigation and do not
-classify them as verified backups. Copy a successful backup and its manifest off host, and
-regularly run `verify-restore.ps1` against a retained copy:
+The script first creates local custom-format archives for both PostgreSQL services, checks that
+each archive can be listed, writes SHA-256 hashes, and restores both archives into fresh,
+network-isolated temporary containers. It checks LedgerX migration history and financial tables
+and Keycloak's realm table. Only then does it upload the backup to the configured remote and
+download all remote bytes for comparison. A failed local step or failed remote upload/check exits
+nonzero. A successful local backup is preserved if the remote fails; investigate and retry with
+`replicate-backup.ps1`. The remote defaults to `gdrive:LedgerX-Backups`; override it with
+`LEDGERX_BACKUP_REMOTE` in `.env` or the host environment, or pass `-Remote`.
+
+`rclone.exe` must be on PATH for the account running the backup. Its OAuth configuration remains
+in that account's external rclone configuration file, never in this repository. Check the scheduled
+task's PATH, Docker access, and rclone account before relying on unattended backups. Regularly
+verify a retained local copy:
 
 ```powershell
-.\scripts\verify-restore.ps1 -BackupDirectory D:\LedgerXBackups\BACKUP_ID
+.\scripts\verify-restore.ps1 -BackupDirectory C:\LedgerXBackups\BACKUP_ID
 ```
 
-Schedule daily backups, retain multiple generations off host, and record the newest successfully
-restored backup timestamp. A daily schedule alone permits almost 24 hours of data loss; choose
-frequency to meet the actual recovery point objective. The disposable restore's elapsed time is
-only a component of recovery time; measure a full application cutover before declaring an RTO.
+The optional `-ApplyRetention` prunes only script-marked backup-ID directories beneath the exact
+`LedgerX-Backups` destination, after the new upload passes verification. It keeps one backup for
+each of the latest 7 UTC days, 4 ISO weeks, and 6 calendar months. It does not prune local backups
+or unrelated remote folders. Without the switch, no remote backup is deleted. Review the first
+scheduled runs and retain extra local generations according to available disk space.
+
+Schedule the command above daily in Windows Task Scheduler under the account that owns the rclone
+configuration and can use Docker Desktop. Run `pwsh.exe` with `-NoProfile -File` followed by the
+absolute script path and arguments; set the working directory to the repository root. Monitor the
+task's nonzero exit code and newest verified manifest. A daily schedule alone permits almost 24
+hours of data loss; choose frequency to meet the recovery point objective. The disposable
+restore's elapsed time is only part of recovery time; measure a full application cutover before
+declaring an RTO.
+
+## Retrieve and rehearse an off-host backup
+
+List backup generations and inspect the selected generation:
+
+```powershell
+rclone lsf --dirs-only gdrive:LedgerX-Backups
+rclone ls gdrive:LedgerX-Backups/BACKUP_ID
+```
+
+Download into a new private directory outside the repository, then verify hashes and restore both
+databases into disposable, network-isolated PostgreSQL containers. This does not touch production:
+
+```powershell
+New-Item -ItemType Directory -Path C:\LedgerXRecovery\BACKUP_ID -Force | Out-Null
+rclone copy gdrive:LedgerX-Backups/BACKUP_ID C:\LedgerXRecovery\BACKUP_ID
+.\scripts\verify-restore.ps1 -BackupDirectory C:\LedgerXRecovery\BACKUP_ID
+```
+
+For an already available local backup, the following command performs upload, byte comparison,
+remote download, and the same disposable restore drill, then removes its temporary download:
+
+```powershell
+.\scripts\replicate-backup.ps1 -BackupDirectory C:\LedgerXBackups\BACKUP_ID -DownloadVerify
+```
+
+An isolated remote restore proves the archives can be recovered; it does not prove full service
+cutover, login, reconciliation, or measured RPO/RTO. Follow the fresh-deployment procedure below
+for a real incident or a full cutover rehearsal.
+
+### Deployment evidence, 2026-09-29
+
+| Check | Result |
+| --- | --- |
+| Local backup and isolated restore | Completed for both databases |
+| Off-host upload to `gdrive:LedgerX-Backups` | Completed for retained backup `20260928T215244Z-117607e2` |
+| Remote byte comparison | Completed with `rclone check --download` |
+| Remote download and isolated restore | Completed for both databases |
+| Full production cutover and measured RPO/RTO | Still pending |
 
 ## Restore into a fresh deployment
 

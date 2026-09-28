@@ -107,8 +107,10 @@ configured receiver and a live deployment drill.
 
 **Implemented in code:** two-database custom-format backup with hashes and disposable restore
 verification, a recovery runbook, and integration tests for restored financial facts and
-immutable guards plus audited replay into a fresh Kafka broker. An off-host backup schedule,
-full production cutover rehearsal, and measured RPO/RTO remain deployment acceptance work.
+immutable guards plus audited replay into a fresh Kafka broker. A Google Drive off-host copy,
+remote byte verification, and downloaded isolated restore were exercised on 2026-09-29.
+Unattended scheduling, full production cutover rehearsal, and measured RPO/RTO remain deployment
+acceptance work.
 
 ## Phase 10 — Real identity and browser flows
 
