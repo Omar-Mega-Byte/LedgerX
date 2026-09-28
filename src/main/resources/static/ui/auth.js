@@ -109,7 +109,7 @@ export async function signIn() {
   url.search = new URLSearchParams({
     client_id: config.clientId,
     response_type: 'code',
-    scope: 'openid profile',
+    scope: 'openid',
     redirect_uri: `${location.origin}/`,
     state,
     code_challenge: challenge,

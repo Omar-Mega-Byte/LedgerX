@@ -110,6 +110,15 @@ verification, a recovery runbook, and integration tests for restored financial f
 immutable guards plus audited replay into a fresh Kafka broker. An off-host backup schedule,
 full production cutover rehearsal, and measured RPO/RTO remain deployment acceptance work.
 
+## Phase 10 — Real identity and browser flows
+
+**Implemented in repository:** an isolated production-profile Compose test stack with Caddy HTTPS,
+the imported Keycloak realm, PostgreSQL, Kafka, and LedgerX; Chromium sign-ins using Authorization
+Code with S256 PKCE; Keycloak owner and operator fixture users; browser provisioning, payment,
+and refund; API authorization checks; and Kafka consumer evidence. The test runs in CI separately
+from Maven's mocked-JWT integration tests. Live public TLS, configured production identities,
+and merchant delivery still require deployment acceptance.
+
 ## Change policy
 
 When priorities change, update this roadmap and the backlog together. Do not represent a roadmap item as implemented until the corresponding code, tests, and documentation support the claim.
