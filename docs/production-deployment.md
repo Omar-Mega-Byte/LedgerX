@@ -104,8 +104,17 @@ bootstrap credentials from `.env`, then create users through the admin console. 
 is disabled.
 
 For each user allowed to call LedgerX, set the user attribute `ledgerx_owner_id` to the UUID of an
-existing active `wallet_owners` record. The imported `ledgerx-owner` client scope includes this UUID
-and the `ledgerx-api` audience in signed access tokens. LedgerX rejects a token missing either.
+existing active `wallet_owners` record. The imported realm defines this as an administrator-only
+managed user-profile attribute. Its default `ledgerx-owner` client scope includes the UUID,
+`ledgerx-api` audience, and realm roles in signed access tokens. LedgerX rejects a token missing
+the owner or audience for owner-scoped routes.
+
+Realm import does not update an existing realm. If the realm was imported before the managed
+`ledgerx_owner_id` attribute and realm-role mapper were added, configure those in Keycloak before
+creating or updating users. Give only administrators permission to edit the owner attribute, map
+it to the `ledgerx_owner_id` access-token claim, and ensure the web client emits the
+`ledgerx-api` audience and `ledgerx-operator` realm role. Test a fresh browser login after the
+change; updating an attribute does not rewrite an already-issued token.
 
 For operator users, assign the `ledgerx-operator` realm role in Keycloak. Spring Security checks
 that role on `/api/v1/operations/**`; a normal wallet owner token cannot provision owners, suspend
