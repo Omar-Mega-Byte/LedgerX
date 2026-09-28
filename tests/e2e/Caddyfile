@@ -1,0 +1,15 @@
+https://localhost:{$E2E_WEB_PORT} {
+	tls internal
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://localhost:{$E2E_IDP_PORT}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+	}
+	@privateMetrics path /actuator/prometheus
+	respond @privateMetrics 404
+	reverse_proxy ledgerx:8080
+}
+
+https://localhost:{$E2E_IDP_PORT} {
+	tls internal
+	reverse_proxy keycloak:8080
+}

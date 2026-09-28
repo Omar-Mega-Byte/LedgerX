@@ -1,0 +1,134 @@
+services:
+  postgres:
+    image: postgres:17.11-alpine3.24
+    env_file: ${E2E_POSTGRES_ENV_FILE:?set by the test runner}
+    environment:
+      POSTGRES_DB: ledgerx
+      POSTGRES_USER: ${E2E_DB_USERNAME:?set by the test runner}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d ledgerx"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [data]
+
+  keycloak-postgres:
+    image: postgres:17.11-alpine3.24
+    env_file: ${E2E_KEYCLOAK_POSTGRES_ENV_FILE:?set by the test runner}
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: ${E2E_KEYCLOAK_DB_USERNAME:?set by the test runner}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [identity]
+
+  kafka:
+    image: apache/kafka:3.9.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks: [events]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    command: ["start", "--import-realm"]
+    env_file: ${E2E_KEYCLOAK_ENV_FILE:?set by the test runner}
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${E2E_KEYCLOAK_ADMIN_USERNAME:?set by the test runner}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: ${E2E_KEYCLOAK_DB_USERNAME:?set by the test runner}
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME: https://localhost:${E2E_IDP_PORT:?set by the test runner}
+      LEDGERX_WEB_ORIGIN: https://localhost:${E2E_WEB_PORT:?set by the test runner}
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+    networks: [edge, identity]
+
+  ledgerx:
+    image: eclipse-temurin:21-jre-alpine
+    env_file: ${E2E_LEDGERX_ENV_FILE:?set by the test runner}
+    working_dir: /app
+    command: ["java", "-jar", "/app/app.jar"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    volumes:
+      - ./target/ledgerx-0.0.1-SNAPSHOT.jar:/app/app.jar:ro
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      LEDGERX_DB_URL: jdbc:postgresql://postgres:5432/ledgerx?currentSchema=ledgerx
+      LEDGERX_DB_USERNAME: ${E2E_DB_USERNAME:?set by the test runner}
+      LEDGERX_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      LEDGERX_KAFKA_CONSUMER_ENABLED: "true"
+      LEDGERX_OUTBOX_PUBLISHER_ENABLED: "true"
+      LEDGERX_OIDC_ISSUER_URI: https://localhost:${E2E_IDP_PORT:?set by the test runner}/realms/ledgerx
+      LEDGERX_OIDC_API_CLIENT_ID: ledgerx-api
+      LEDGERX_WEB_CLIENT_ID: ledgerx-web
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/ledgerx/protocol/openid-connect/certs
+      LEDGERX_WEBHOOK_CONSUMER_ENABLED: "false"
+      LEDGERX_WEBHOOK_DISPATCHER_ENABLED: "false"
+      LEDGERX_RECONCILIATION_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    networks: [edge, data, events]
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    environment:
+      E2E_WEB_PORT: ${E2E_WEB_PORT:?set by the test runner}
+      E2E_IDP_PORT: ${E2E_IDP_PORT:?set by the test runner}
+    ports:
+      - "127.0.0.1:${E2E_WEB_PORT}:${E2E_WEB_PORT}"
+      - "127.0.0.1:${E2E_IDP_PORT}:${E2E_IDP_PORT}"
+    depends_on:
+      ledgerx:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    volumes:
+      - ./tests/e2e/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [edge]
+
+networks:
+  edge:
+  data:
+    internal: true
+  identity:
+    internal: true
+  events:
+    internal: true

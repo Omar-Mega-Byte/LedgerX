@@ -30,3 +30,7 @@ jobs:
           docker compose --env-file .env.example -f compose.production.yaml config --quiet
       - name: Verify
         run: bash ./mvnw --batch-mode verify
+      - name: Install Chromium for real identity browser flows
+        run: npx playwright install --with-deps chromium
+      - name: Test production-profile browser stack
+        run: npm run test:e2e
