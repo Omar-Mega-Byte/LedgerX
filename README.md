@@ -82,12 +82,14 @@ The project runs as a modular monolith. PostgreSQL is the financial source of tr
 Requires a Java 21 JDK. Maven does not need to be installed globally; the checked-in wrapper downloads its pinned Maven distribution on first use.
 
 ```powershell
-docker compose up -d postgres kafka
-.\mvnw.cmd clean verify
-.\mvnw.cmd spring-boot:run
+docker compose -p ledgerx-dev up -d --build
+docker compose -p ledgerx-dev ps
+.\mvnw.cmd verify
 ```
 
-Then check the application health at <http://localhost:8080/actuator/health>.
+Then check the local application health at <http://127.0.0.1:8080/actuator/health>.
+Only the local Compose stack publishes port 8080; the production stack is served through
+Caddy HTTPS. Keep the project names separate when running both on one machine.
 The complete verification uses Docker-backed PostgreSQL and Kafka Testcontainers. It runs unit,
 API, database, messaging, security, and concurrency tests without a separate Keycloak process.
 
