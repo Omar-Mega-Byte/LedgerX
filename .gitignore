@@ -78,3 +78,5 @@ graphify-out/
 # Frontend tooling cache; the shipped UI is dependency-free static assets.
 node_modules/
 .npm-cache/
+playwright-report/
+test-results/

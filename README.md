@@ -34,6 +34,9 @@ original payer to retry the exact request and idempotency key. See [the architec
 
 The UI uses dependency-free browser modules with JSDoc type checks. Run `npm ci` and
 `npm run check:ui` to check browser code; Maven packages the static files directly.
+The separate `npm run test:e2e` suite launches an isolated production-profile Compose stack
+with Keycloak, Caddy HTTPS, PostgreSQL, and Kafka, then exercises real Chromium sign-ins and
+money movement. See [the development guide](docs/development.md) for the setup and test scope.
 
 ## Why LedgerX
 
@@ -70,6 +73,7 @@ Transfers, payments, refunds, and local demo funding use the same immutable doub
 ├── docs/                 # Architecture and development documentation
 ├── compose.yaml          # Local PostgreSQL, Kafka, and containerized application
 ├── compose.production.yaml # Private dependencies behind Caddy HTTPS
+├── compose.e2e.yaml      # Disposable real-identity browser test stack
 ├── src/                  # Spring Boot application and tests
 ├── pom.xml               # Maven build and verification configuration
 └── mvnw.cmd              # Pinned Maven Wrapper for Windows
@@ -92,6 +96,7 @@ Only the local Compose stack publishes port 8080; the production stack is served
 Caddy HTTPS. Keep the project names separate when running both on one machine.
 The complete verification uses Docker-backed PostgreSQL and Kafka Testcontainers. It runs unit,
 API, database, messaging, security, and concurrency tests without a separate Keycloak process.
+CI also runs the real-Keycloak Chromium suite against its disposable stack.
 
 See [configuration conventions](docs/configuration.md) for profiles, environment variables, and secret handling. [Docker instructions](docs/docker.md) cover the local database and full containerized stack.
 For the self-hosted public stack, use [the production deployment guide](docs/production-deployment.md).

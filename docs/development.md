@@ -32,6 +32,7 @@ Each meaningful change should include verification appropriate to its risk:
 | API behavior | Controller/application test for status, validation, and authorization |
 | Concurrent money movement | Repeatable concurrent test proving invariant preservation |
 | Documentation/configuration | Review rendered Markdown and confirm no secrets are tracked |
+| Production identity and browser flow | Run the isolated real-Keycloak Chromium suite |
 
 The standard local verification command is:
 
@@ -40,6 +41,29 @@ The standard local verification command is:
 ```
 
 Use `*Test` for fast unit tests and `*IntegrationTest` for Docker-backed integration tests. The latter run during Maven's `verify` phase, not its unit-test phase.
+
+## Real identity and browser verification
+
+Install Node.js 24, then run from the repository root:
+
+```powershell
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+The runner creates a unique Compose project with ephemeral credentials and free loopback ports.
+It starts the production Spring profile, the imported Keycloak realm, PostgreSQL, Kafka, and a
+local-CA Caddy HTTPS edge; Playwright ignores that disposable certificate. It creates test users
+through Keycloak administration, then signs them in through the browser's Authorization Code and
+S256 PKCE flow. The scenario checks unauthenticated access, operator-only provisioning, signed
+owner claims, cross-owner isolation, browser payment/refund, and Kafka audit consumption. A
+balanced SQL journal supplies the initial test-only balance because production has no public
+funding action. The runner removes only its uniquely named Compose project and data when done.
+CI installs Chromium and its Linux dependencies before running this suite.
+
+This suite does not verify a public certificate, external merchant webhook delivery, or a live
+deployment's Keycloak configuration. Continue those checks during deployment acceptance.
 
 ## Local demo wallet funding
 

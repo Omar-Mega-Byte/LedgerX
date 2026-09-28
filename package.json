@@ -3,9 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "check:ui": "tsc --project jsconfig.json"
+    "check:ui": "tsc --project jsconfig.json",
+    "test:e2e": "node tests/e2e/run.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "typescript": "5.9.3"
   }
 }
