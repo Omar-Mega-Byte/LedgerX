@@ -65,4 +65,8 @@ HTTPS and DNS destinations before exposing merchant webhook registration.
 
 ## Health endpoint
 
-Actuator exposes `health`, `info`, and `metrics` over HTTP. The production filter chain permits health probes without authentication and limits metrics to operators; owner APIs require authentication and operator APIs require the operator role.
+Actuator exposes `health`, `info`, `metrics`, and `prometheus` over HTTP. The production filter
+chain permits health probes without authentication, limits `/actuator/metrics` to operators, and
+permits the private Prometheus scrape. Production Caddy returns 404 for the public
+`/actuator/prometheus` route; the scrape reaches LedgerX only on the private monitoring network.
+Owner APIs require authentication and operator APIs require the operator role.
