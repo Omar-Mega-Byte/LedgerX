@@ -74,7 +74,12 @@ Transfers, payments, refunds, and local demo funding use the same immutable doub
 ├── compose.yaml          # Local PostgreSQL, Kafka, and containerized application
 ├── compose.production.yaml # Private dependencies behind Caddy HTTPS
 ├── compose.e2e.yaml      # Disposable real-identity browser test stack
-├── src/                  # Spring Boot application and tests
+├── keycloak/              # Imported identity realm
+├── monitoring/            # Prometheus, Alertmanager, and Grafana configuration
+├── scripts/               # Backup, restore, replay, and Graphify maintenance
+├── src/main/              # Spring Boot code, Flyway migrations, and static workbench
+├── src/test/              # Unit and Testcontainers integration tests
+├── tests/e2e/            # Real-identity Chromium tests
 ├── pom.xml               # Maven build and verification configuration
 └── mvnw.cmd              # Pinned Maven Wrapper for Windows
 ```

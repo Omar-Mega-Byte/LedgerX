@@ -1,10 +1,6 @@
-.git
-.github
-.idea
-.serena
-.vscode
-docs
-target/*
-!target/*.jar
-*.log
-.env
+# The image build reads only pom.xml and application sources.
+# Keep local credentials, backups, tooling caches, and test output out of the build context.
+*
+!pom.xml
+!src/
+!src/**
