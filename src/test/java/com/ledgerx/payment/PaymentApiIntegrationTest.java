@@ -45,6 +45,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -59,6 +60,7 @@ import org.testcontainers.utility.DockerImageName;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class PaymentApiIntegrationTest {
 
   @Container
@@ -363,6 +365,75 @@ class PaymentApiIntegrationTest {
                 jdbcTemplate.update(
                     "DELETE FROM ledgerx.outbox_events WHERE aggregate_id = ?", paymentId))
         .isInstanceOf(DataAccessException.class);
+  }
+
+  @Test
+  void databaseRejectsRefundsThatExceedOrChangeTheOriginalPayment() throws Exception {
+    FundedWallet payer = fundedWallet(OwnerType.PERSON, "20.00");
+    WalletRegistration merchant = walletAccountService.createWallet(OwnerType.MERCHANT);
+    WalletRegistration otherMerchant = walletAccountService.createWallet(OwnerType.MERCHANT);
+    MvcResult paymentResponse =
+        postPayment(
+                payer.ownerId(),
+                "database-refund-guard",
+                payer.walletId(),
+                merchant.walletAccountId(),
+                "10.00")
+            .andExpect(status().isCreated())
+            .andReturn();
+    UUID paymentId = paymentId(paymentResponse);
+    UUID existingJournalId =
+        UUID.fromString(body(paymentResponse).get("ledgerTransactionId").asText());
+
+    assertThatThrownBy(
+            () ->
+                insertRefundDirectly(
+                    paymentId,
+                    merchant.walletAccountId(),
+                    payer.walletId(),
+                    existingJournalId,
+                    "10.01"))
+        .isInstanceOf(DataAccessException.class)
+        .hasMessageContaining("refund total exceeds payment amount");
+    assertThatThrownBy(
+            () ->
+                insertRefundDirectly(
+                    paymentId,
+                    otherMerchant.walletAccountId(),
+                    payer.walletId(),
+                    existingJournalId,
+                    "1.00"))
+        .isInstanceOf(DataAccessException.class)
+        .hasMessageContaining("refund participants differ from payment");
+    assertThatThrownBy(
+            () ->
+                insertRefundDirectly(
+                    paymentId,
+                    merchant.walletAccountId(),
+                    payer.walletId(),
+                    existingJournalId,
+                    "1.00"))
+        .isInstanceOf(DataAccessException.class)
+        .hasMessageContaining("refund cannot reuse payment journal");
+    assertThat(count("SELECT COUNT(*) FROM ledgerx.refunds WHERE payment_id = ?", paymentId))
+        .isZero();
+  }
+
+  private void insertRefundDirectly(
+      UUID paymentId, UUID merchantWalletId, UUID payerWalletId, UUID journalId, String amount) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO ledgerx.refunds
+            (id, payment_id, merchant_wallet_account_id, payer_wallet_account_id,
+             amount, currency, ledger_transaction_id, completed_at)
+        VALUES (?, ?, ?, ?, ?, 'USD', ?, CURRENT_TIMESTAMP)
+        """,
+        UUID.randomUUID(),
+        paymentId,
+        merchantWalletId,
+        payerWalletId,
+        new BigDecimal(amount),
+        journalId);
   }
 
   @Test
