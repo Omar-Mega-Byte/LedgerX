@@ -90,11 +90,11 @@ share an origin, and access tokens stay in browser memory. A page refresh requir
 again; an existing Keycloak session normally makes this quick.
 
 Realm import does not overwrite an existing realm during normal startup. If this realm predates
-the workbench, add or update the `ledgerx-web` public client in Keycloak with Standard Flow and
-S256 PKCE, `https://YOUR_LEDGERX_PUBLIC_DOMAIN/` as its exact valid redirect URI, and
-`https://YOUR_LEDGERX_PUBLIC_DOMAIN` as its web origin. Add
-`https://YOUR_LEDGERX_PUBLIC_DOMAIN/?signed-out=1` as a valid post-logout redirect URI. Keep the
-`ledgerx-api` audience mapper on the access token.
+the workbench or operator role, run `./scripts/reconcile-production-realm.ps1 -EnvFile .env`
+from the deployment host. The script uses the configured Keycloak admin account, adds missing
+browser client and role settings, and checks exact HTTPS redirect, S256 PKCE, owner attribute,
+audience, and operator role settings. It stops if an existing client has unexpected security
+settings; inspect that client before changing it. Run it again to verify the result is stable.
 
 ## Keycloak owner mapping
 
