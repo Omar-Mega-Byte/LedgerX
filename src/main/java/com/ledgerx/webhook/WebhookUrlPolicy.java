@@ -42,15 +42,19 @@ public class WebhookUrlPolicy {
         throw new WebhookValidationException("webhook URL must use the standard HTTPS port");
       }
       rejectUnsafeHost(uri.getHost());
-      return new URI(
+      URI origin =
+          new URI(
               scheme.toLowerCase(Locale.ROOT),
               null,
               uri.getHost().toLowerCase(Locale.ROOT),
               uri.getPort(),
-              uri.getRawPath() == null || uri.getRawPath().isBlank() ? "/" : uri.getRawPath(),
               null,
-              null)
-          .toASCIIString();
+              null,
+              null);
+      String rawPath =
+          uri.getRawPath() == null || uri.getRawPath().isBlank() ? "/" : uri.getRawPath();
+      // The component constructor escapes percent signs, changing an encoded receiver path.
+      return URI.create(origin.toASCIIString() + rawPath).toASCIIString();
     } catch (URISyntaxException exception) {
       throw new WebhookValidationException("webhook URL is invalid");
     }
