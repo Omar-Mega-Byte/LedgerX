@@ -42,6 +42,12 @@ Financial operations must make the following rules explicit in code, database co
 5. A command retry with the same idempotency scope, key, and payload has one financial effect and can replay its original result.
 6. Concurrent debits cannot create a negative available balance unless an explicitly designed credit facility permits it.
 
+Refund creation also has a PostgreSQL insert guard: it locks the original payment row,
+requires the original participants and currency, rejects reuse of the payment journal, and
+prevents cumulative refunds from exceeding the payment amount. This backs up the application
+service's validation when multiple writers or direct database access are involved. Journal
+balance and immutability remain enforced by the ledger triggers.
+
 ## Reliability model
 
 The desired flow for a state-changing command is:

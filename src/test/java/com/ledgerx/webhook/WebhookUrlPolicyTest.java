@@ -16,6 +16,14 @@ class WebhookUrlPolicyTest {
   }
 
   @Test
+  void preservesAnEncodedReceiverPathWhenNormalizingTheHost() {
+    WebhookUrlPolicy policy = new WebhookUrlPolicy(new WebhookProperties());
+
+    assertThat(policy.normalize("https://Merchant.Example.com/hooks%2Ftenant/%E2%82%AC"))
+        .isEqualTo("https://merchant.example.com/hooks%2Ftenant/%E2%82%AC");
+  }
+
+  @Test
   void rejectsHttpAndCredentialBearingEndpointsByDefault() {
     WebhookUrlPolicy policy = new WebhookUrlPolicy(new WebhookProperties());
 

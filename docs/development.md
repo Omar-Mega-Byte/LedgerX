@@ -41,6 +41,9 @@ The standard local verification command is:
 ```
 
 Use `*Test` for fast unit tests and `*IntegrationTest` for Docker-backed integration tests. The latter run during Maven's `verify` phase, not its unit-test phase.
+Spring integration tests with class-scoped Testcontainers close their cached application context
+after the class. Otherwise scheduled workers can keep using a datasource after JUnit stops its
+PostgreSQL container, creating connection errors and delaying test JVM shutdown.
 
 ## Real identity and browser verification
 
