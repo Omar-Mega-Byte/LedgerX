@@ -86,6 +86,19 @@ An isolated remote restore proves the archives can be recovered; it does not pro
 cutover, login, reconciliation, or measured RPO/RTO. Follow the fresh-deployment procedure below
 for a real incident or a full cutover rehearsal.
 
+To verify application startup and reconciliation against a restored LedgerX archive without
+touching production volumes, use the current `ledgerx-ledgerx:latest` image after a successful
+database restore drill:
+
+```powershell
+.\scripts\verify-application-restore.ps1 -BackupDirectory C:\LedgerXRecovery\BACKUP_ID -EnvFile .env
+```
+
+This creates disposable Docker network, database, and application containers with no host ports.
+It validates the archive hash, restored Flyway version, application health, and a new reconciliation
+run with zero findings. It removes its containers and network afterward. It does not start the
+restored Keycloak service, exercise login, or switch public traffic.
+
 ### Deployment evidence, 2026-09-29
 
 | Check | Result |
