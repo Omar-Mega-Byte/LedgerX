@@ -177,6 +177,7 @@ COMMIT;`);
 }
 
 test('real Keycloak PKCE identities complete owner, operator, payment and refund browser flows', async ({ browser, request }) => {
+  if (live && process.env.E2E_EXPIRED_TOKEN === '1') test.setTimeout(720_000);
   await test.step('Wait for the imported realm and secure public edge', async () => {
     await expect.poll(async () => {
       try { return (await request.get(`${idpOrigin}/realms/ledgerx/.well-known/openid-configuration`)).status(); }
@@ -451,6 +452,24 @@ test('real Keycloak PKCE identities complete owner, operator, payment and refund
       expect(Number(sql('SELECT COUNT(*) FROM ledgerx.payments;'))).toBe(before + 5);
       const durations = results.map(result => result.durationMs).sort((a, b) => a - b);
       console.log(`Phase Y concurrent payments: 5 created, 5 replays, median=${durations[2]}ms, max=${durations[4]}ms`);
+    });
+  }
+
+  if (live && process.env.E2E_EXPIRED_TOKEN === '1') {
+    await test.step('A real access token is rejected after the validator clock skew', async () => {
+      const claims = JSON.parse(Buffer.from(payerToken.split('.')[1], 'base64url').toString('utf8'));
+      expect(Number.isSafeInteger(claims.exp)).toBe(true);
+      const firstWaitMs = Math.max(0, claims.exp * 1000 - Date.now() + 1_500);
+      expect(firstWaitMs).toBeLessThan(600_000);
+      await new Promise(resolve => setTimeout(resolve, firstWaitMs));
+      expect((await request.get(`${webOrigin}/api/v1/me`, {
+        headers: { Authorization: `Bearer ${payerToken}` },
+      })).status()).toBe(200);
+      const finalWaitMs = Math.max(0, claims.exp * 1000 - Date.now() + 65_000);
+      await new Promise(resolve => setTimeout(resolve, finalWaitMs));
+      expect((await request.get(`${webOrigin}/api/v1/me`, {
+        headers: { Authorization: `Bearer ${payerToken}` },
+      })).status()).toBe(401);
     });
   }
 });
