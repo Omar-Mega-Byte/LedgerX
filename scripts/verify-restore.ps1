@@ -45,13 +45,42 @@ foreach ($entry in $manifest.archives) {
         if ($entry.file -eq 'ledgerx.dump') {
             $check = (& docker exec $containerId psql -X -A -t -v ON_ERROR_STOP=1 -U drill -d drill -c `
                 'SELECT COUNT(*) FROM ledgerx.flyway_schema_history WHERE success = true').Trim()
-            if ($LASTEXITCODE -ne 0 -or [int]$check -lt 14) { throw 'LedgerX migrations were not restored.' }
-            & docker exec $containerId psql -X -A -t -v ON_ERROR_STOP=1 -U drill -d drill -c `
-                "SELECT COUNT(*) FROM ledgerx.ledger_entries; SELECT COUNT(*) FROM ledgerx.payments; SELECT COUNT(*) FROM ledgerx.outbox_events;" | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw 'LedgerX financial tables were not restored.' }
+            if ($LASTEXITCODE -ne 0 -or [int]$check -lt 15) { throw 'LedgerX migrations were not restored.' }
             $guard = (& docker exec $containerId psql -X -A -t -v ON_ERROR_STOP=1 -U drill -d drill -c `
-                "SELECT COUNT(*) FROM pg_trigger WHERE tgname = 'ledger_entries_immutable' AND NOT tgisinternal").Trim()
-            if ($LASTEXITCODE -ne 0 -or [int]$guard -ne 1) { throw 'Immutable journal guard was not restored.' }
+                "SELECT COUNT(*) FROM pg_trigger WHERE tgname IN ('ledger_entries_immutable', 'refunds_payment_bounds_guard') AND NOT tgisinternal").Trim()
+            if ($LASTEXITCODE -ne 0 -or [int]$guard -ne 2) { throw 'Financial integrity triggers were not restored.' }
+            $integritySql = @'
+WITH journal_net AS (
+    SELECT ledger_transaction_id,
+           SUM(CASE WHEN side = 'DEBIT' THEN amount ELSE -amount END) AS net
+    FROM ledgerx.ledger_entries GROUP BY ledger_transaction_id
+), wallet_balances AS (
+    SELECT a.id,
+           COALESCE(SUM(CASE WHEN e.side = 'CREDIT' THEN e.amount ELSE -e.amount END), 0) AS balance
+    FROM ledgerx.ledger_accounts a
+    LEFT JOIN ledgerx.ledger_entries e ON e.ledger_account_id = a.id
+    WHERE a.account_kind = 'WALLET'
+    GROUP BY a.id
+), refund_totals AS (
+    SELECT p.id, p.amount, COALESCE(SUM(r.amount), 0) AS refunded
+    FROM ledgerx.payments p
+    LEFT JOIN ledgerx.refunds r ON r.payment_id = p.id
+    GROUP BY p.id, p.amount
+)
+SELECT (SELECT COUNT(*) FROM journal_net WHERE net <> 0) || '|' ||
+       (SELECT COUNT(*) FROM wallet_balances WHERE balance < 0) || '|' ||
+       (SELECT COUNT(*) FROM refund_totals WHERE refunded > amount) || '|' ||
+       (SELECT COUNT(*) FROM ledgerx.payments) || '|' ||
+       (SELECT COUNT(*) FROM ledgerx.refunds) || '|' ||
+       (SELECT COUNT(*) FROM ledgerx.ledger_transactions);
+'@
+            $integrity = (& docker exec $containerId psql -X -A -t -v ON_ERROR_STOP=1 -U drill -d drill -c $integritySql).Trim()
+            if ($LASTEXITCODE -ne 0) { throw 'Could not check restored financial records.' }
+            $counts = $integrity -split '\|'
+            if ($counts.Count -ne 6 -or @($counts[0..2] | Where-Object { $_ -ne '0' }).Count -ne 0) {
+                throw 'Restored financial records violate a ledger, wallet, or refund invariant.'
+            }
+            Write-Output "Restored financial records: payments=$($counts[3]), refunds=$($counts[4]), journals=$($counts[5]); invariants hold."
         } else {
             $realmCount = (& docker exec $containerId psql -X -A -t -v ON_ERROR_STOP=1 -U drill -d drill -c `
                 'SELECT COUNT(*) FROM public.realm').Trim()
