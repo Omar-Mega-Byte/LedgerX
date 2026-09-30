@@ -56,6 +56,20 @@ if ('ledgerx-realm-roles' -notin $mapperNames) {
     } | Out-Null
     Write-Output 'Added missing realm-role access-token mapper.'
 }
+if ('ledgerx-subject' -notin $mapperNames) {
+    Post-RealmResource "client-scopes/$($scope.id)/protocol-mappers/models" @{
+        name = 'ledgerx-subject'
+        protocol = 'openid-connect'
+        protocolMapper = 'oidc-sub-mapper'
+        consentRequired = $false
+        config = @{
+            'access.token.claim' = 'true'
+            'id.token.claim' = 'true'
+            'userinfo.token.claim' = 'true'
+        }
+    } | Out-Null
+    Write-Output 'Added missing subject claim mapper.'
+}
 
 $roles = @((Get-RealmResource 'roles').name)
 if ('ledgerx-operator' -notin $roles) {
@@ -118,13 +132,14 @@ if ('ledgerx-owner' -notin $defaults) {
     Put-RealmResource "clients/$($webClient.id)/default-client-scopes/$($scope.id)" @{} | Out-Null
     Write-Output 'Attached the owner, audience, and role scope to the workbench client.'
 }
-
 $finalProfile = Get-RealmResource 'users/profile'
 $ownerAttribute = $finalProfile.attributes | Where-Object name -eq 'ledgerx_owner_id' | Select-Object -First 1
 $finalMappers = @((Get-RealmResource "client-scopes/$($scope.id)/protocol-mappers/models").name)
 $finalRoles = @((Get-RealmResource 'roles').name)
+$finalDefaults = @((Get-RealmResource "clients/$($webClient.id)/default-client-scopes").name)
 if (-not $ownerAttribute -or ($ownerAttribute.permissions.edit -join ',') -ne 'admin' -or
-    'ledgerx-realm-roles' -notin $finalMappers -or 'ledgerx-operator' -notin $finalRoles) {
+    'ledgerx-realm-roles' -notin $finalMappers -or 'ledgerx-subject' -notin $finalMappers -or
+    'ledgerx-operator' -notin $finalRoles -or 'ledgerx-owner' -notin $finalDefaults) {
     throw 'Realm verification failed after reconciliation.'
 }
-Write-Output 'Production realm browser client, owner claim, audience, and operator role verified.'
+Write-Output 'Production realm browser client, subject, owner claim, audience, and operator role verified.'

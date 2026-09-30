@@ -38,6 +38,17 @@
       },
       "protocolMappers": [
         {
+          "name": "ledgerx-subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
           "name": "ledgerx-realm-roles",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-realm-role-mapper",
@@ -101,6 +112,7 @@
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
+      "defaultClientScopes": ["ledgerx-owner"],
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
