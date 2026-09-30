@@ -1,4 +1,4 @@
-# Phase Y: live production acceptance record
+# Live deployment acceptance record — 2026-09-29
 
 Date: 2026-09-29. This record concerns the single-host Windows/Docker Desktop deployment and
 synthetic `phase-y-*` identities and transactions. It is a record of observed checks, not a claim
@@ -193,21 +193,21 @@ production webhook workers remain enabled.
 | Operational monitoring | Pending | External firing/resolved proof with temporary receiver; no durable receiver |
 | End-to-end verification | Verified with limits | Real browser, Kafka, webhook, financial invariants; outage gaps above |
 
-The deployment has substantial live acceptance evidence, but Phase Y is not fully closed while
+The deployment has substantial live acceptance evidence, but acceptance remains open while
 durable alerting, unattended backups, and the listed recovery exercises remain outstanding.
 
 ## Verification commands and results
 
 | Command | Result |
 | --- | --- |
-| `.\mvnw.cmd --% -Dmaven.repo.local=C:\Users\Tolis\.m2\repository clean verify` | BUILD SUCCESS; 46 unit and 77 integration tests |
+| Maven Wrapper `clean verify` with a private writable cache override | BUILD SUCCESS; 46 unit and 77 integration tests |
 | `npm run check:ui` | Passed |
 | `npm run test:e2e` | Two isolated Chromium scenarios passed; stack removed |
 | `.\scripts\tests\backup-offhost.Tests.ps1` | Passed |
 | `docker compose --env-file .env -f compose.production.yaml config --quiet` | Passed |
-| `.\scripts\backup-production.ps1 -Destination 'C:\Users\Tolis\Desktop\Java\LedgerX-backups' -EnvFile .env -DownloadVerify` | Three generations passed local, off-host, and downloaded restore checks |
-| `rclone check --download 'gdrive:LedgerX-Backups/20260929T210129Z-71ce68a8' 'C:\Users\Tolis\Desktop\Java\LedgerX-backups\20260929T210129Z-71ce68a8' -v` | Four matching files, zero differences |
-| `.\scripts\verify-application-restore.ps1 -BackupDirectory 'C:\Users\Tolis\Desktop\Java\LedgerX-backups\20260929T210129Z-71ce68a8' -EnvFile .env` | Restored application healthy; new reconciliation `COMPLETED:0` |
+| `backup-production.ps1 -Destination <private-backup-directory> -EnvFile .env -DownloadVerify` | Three generations passed local, off-host, and downloaded restore checks |
+| `rclone check --download <off-host-generation> <local-generation> -v` | Four matching files, zero differences |
+| `verify-application-restore.ps1 -BackupDirectory <local-generation> -EnvFile .env` | Restored application healthy; new reconciliation `COMPLETED:0` |
 | `node node_modules/@playwright/test/cli.js test --config playwright.config.mjs tests/e2e/identity-workbench.spec.mjs` with guarded live environment | Two scenarios passed, including real expiry rejection after clock skew |
 | `.\scripts\reconcile-production-realm.ps1 -EnvFile .env` | Passed initial reconciliation, idempotent repeat, and post-restart check |
 | `.\scripts\update-graphify.ps1` | Code graph rebuilt |

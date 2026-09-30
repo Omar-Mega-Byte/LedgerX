@@ -1,6 +1,6 @@
 # Phase 4 — Signed Webhook Delivery and Operational Integrity
 
-> Historical design and verification record. See [current architecture](docs/architecture.md) for the integrated application.
+> Historical design and verification record. See [current architecture](../architecture.md) for the integrated application.
 
 **Status: implemented and verified on 2026-09-23.**
 

@@ -31,6 +31,8 @@ jobs:
           cache: npm
       - name: Check workbench types
         run: npm ci && npm run check:ui
+      - name: Check documentation links and images
+        run: python3 scripts/check-doc-links.py
       - name: Validate production Compose configuration
         run: |
           mkdir -p secrets
