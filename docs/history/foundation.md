@@ -8,10 +8,10 @@
 |---|---|---|
 | Build and runtime | Java 21 Spring Boot application, Maven Wrapper, and Actuator health endpoint | `./mvnw verify`; `GET /actuator/health` |
 | Code quality | Java version enforcement and formatting checks in Maven verification | Maven `verify` |
-| Configuration | `local`, `test`, and `prod` conventions; tracked configuration contains no real secrets | [configuration guide](configuration.md) and `.env.example` |
+| Configuration | `local`, `test`, and `prod` conventions; tracked configuration contains no real secrets | [configuration guide](../configuration.md) and [template](../../.env.example) |
 | Persistence | PostgreSQL, Flyway V1 infrastructure migration, and JPA foundation | Docker Compose and PostgreSQL-backed integration test |
 | Test layers | Fast unit-test naming plus Testcontainers `*IntegrationTest` execution through Failsafe | Maven `verify` with Docker available |
-| Local delivery | Compose services, containerized application, non-root runtime container | [Docker guide](docker.md) |
+| Local delivery | Compose services, containerized application, non-root runtime container | [Development guide](../development.md) |
 | Continuous integration | GitHub Actions `Verify` workflow runs Maven `verify` for pushes and pull requests | Required `Verify` check on pull requests to `main` |
 | Collaboration hygiene | Triage labels, structured bug/feature forms, and a pull-request checklist | `.github/` metadata |
 
@@ -33,6 +33,6 @@ The ledger is the authority for posted financial history. Any balance projection
 ## Delivery guardrails
 
 - Changes to `main` arrive through pull requests and must have a green `Verify` check.
-- Issues use type, priority, area, and triage labels so active work remains traceable to [the backlog](BACKLOG.md).
+- Issues use type, priority, area, and triage labels to keep active work traceable.
 - A change is not complete until tests and documentation substantiate its claim; financial changes also need explicit idempotency, transaction, and concurrency reasoning.
-- The next backlog work is `LGR-01`, `WAL-01`, `XFR-01`, and `SEC-01`; later reliability features remain intentionally deferred.
+- At the time of this foundation record, `LGR-01`, `WAL-01`, `XFR-01`, and `SEC-01` were the next planned work. Those slices were subsequently implemented; see the current [architecture](../architecture.md).

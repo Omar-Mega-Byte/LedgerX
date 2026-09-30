@@ -2,7 +2,40 @@
 
 ## Prerequisites
 
-Install a Java 21 JDK, Git, and Docker Desktop. Docker is required for the PostgreSQL Testcontainers integration tests. Maven is invoked through the checked-in Maven Wrapper, so a global Maven installation is not required.
+Install a Java 21 JDK, Git, and Docker Desktop. Node.js 24 is needed for UI and browser checks. Docker is required for the PostgreSQL/Kafka integration and browser tests. Maven is invoked through the checked-in Maven Wrapper, so a global Maven installation is not required.
+
+## Run a disposable local workbench
+
+From a fresh clone, start the loopback-only local stack:
+
+```powershell
+docker compose -p ledgerx-dev up -d --build --wait
+docker compose -p ledgerx-dev ps
+```
+
+Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/swagger-ui/index.html`. The local profile deliberately has no public owner-provisioning endpoint. To create **disposable local test owners and empty wallets** in the local database, run this once and copy the printed PERSON and MERCHANT owner UUIDs:
+
+```powershell
+$seedSql = @'
+WITH created_owners AS (
+  INSERT INTO ledgerx.wallet_owners (id, owner_type, status, created_at, updated_at)
+  SELECT gen_random_uuid(), kind, 'ACTIVE', now(), now()
+  FROM (VALUES ('PERSON'), ('MERCHANT')) AS kinds(kind)
+  RETURNING id, owner_type
+), created_wallets AS (
+  INSERT INTO ledgerx.ledger_accounts
+    (id, account_kind, account_type, owner_id, system_code, currency, status, created_at)
+  SELECT gen_random_uuid(), 'WALLET', 'LIABILITY', id, NULL, 'USD', 'ACTIVE', now()
+  FROM created_owners
+  RETURNING id, owner_id
+)
+SELECT o.owner_type, o.id AS owner_id, w.id AS wallet_id
+FROM created_owners o JOIN created_wallets w ON w.owner_id = o.id;
+'@
+$seedSql | docker compose -p ledgerx-dev exec -T postgres psql -X -v ON_ERROR_STOP=1 -U ledgerx -d ledgerx
+```
+
+Enter the PERSON owner UUID in the local workbench. Its **Add demo money** action posts a balanced test-money journal; use the printed merchant wallet UUID to try a payment. Sign out and enter the MERCHANT owner UUID to inspect and refund it. This fixture uses the local development owner header, which is forgeable and must never be used as production authentication. A repository `.env` can override the default local database user, password, or port; adjust the `psql` user above if you have changed it. Stop the local stack with `docker compose -p ledgerx-dev down` to retain its volume.
 
 ## Repository hygiene
 
@@ -65,6 +98,8 @@ balanced SQL journal supplies the initial test-only balance because production h
 funding action. The runner removes only its uniquely named Compose project and data when done.
 CI installs Chromium and its Linux dependencies before running this suite.
 
+To regenerate the portfolio workbench screenshots from synthetic E2E data, set `E2E_CAPTURE_PORTFOLIO=1` before running `npm run test:e2e`. The opt-in test writes six images to `docs/images/`, including an operator review case; the test stack and data are removed afterward. The API reference screenshot can be recaptured from local `/swagger-ui/index.html` after changing OpenAPI text.
+
 This suite does not verify a public certificate, external merchant webhook delivery, or a live
 deployment's Keycloak configuration. Continue those checks during deployment acceptance.
 
@@ -82,7 +117,7 @@ Use small, coherent commits with a conventional prefix where practical, for exam
 
 ## Documentation maintenance
 
-Update the README when setup, runnable capabilities, or major project claims change. Update [architecture.md](architecture.md) when a material design decision is made. Keep proposed work in [the backlog](BACKLOG.md); the phase documents are historical design records.
+Update the README when setup, runnable capabilities, or major project claims change. Update [architecture.md](architecture.md) when a material design decision is made. Dated acceptance evidence belongs in [the acceptance record](acceptance-2026-09-29.md); earlier phase documents are retained only as [design history](history/).
 
 ## Graphify knowledge graph
 
