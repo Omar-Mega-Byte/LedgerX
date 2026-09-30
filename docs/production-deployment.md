@@ -92,8 +92,8 @@ again; an existing Keycloak session normally makes this quick.
 Realm import does not overwrite an existing realm during normal startup. If this realm predates
 the workbench or operator role, run `./scripts/reconcile-production-realm.ps1 -EnvFile .env`
 from the deployment host. The script uses the configured Keycloak admin account, adds missing
-browser client and role settings, and checks exact HTTPS redirect, S256 PKCE, owner attribute,
-audience, and operator role settings. It stops if an existing client has unexpected security
+browser client and role settings, and checks exact HTTPS redirect, S256 PKCE, subject mapper,
+owner attribute, audience, and operator role settings. It stops if an existing client has unexpected security
 settings; inspect that client before changing it. Run it again to verify the result is stable.
 
 ## Keycloak owner mapping
@@ -105,15 +105,16 @@ is disabled.
 
 For each user allowed to call LedgerX, set the user attribute `ledgerx_owner_id` to the UUID of an
 existing active `wallet_owners` record. The imported realm defines this as an administrator-only
-managed user-profile attribute. Its default `ledgerx-owner` client scope includes the UUID,
-`ledgerx-api` audience, and realm roles in signed access tokens. LedgerX rejects a token missing
+managed user-profile attribute. Its default `ledgerx-owner` client scope includes the subject,
+UUID, `ledgerx-api` audience, and realm roles in signed access tokens. LedgerX rejects a token missing
 the owner or audience for owner-scoped routes.
 
 Realm import does not update an existing realm. If the realm was imported before the managed
 `ledgerx_owner_id` attribute and realm-role mapper were added, configure those in Keycloak before
 creating or updating users. Give only administrators permission to edit the owner attribute, map
-it to the `ledgerx_owner_id` access-token claim, and ensure the web client emits the
-`ledgerx-api` audience and `ledgerx-operator` realm role. Test a fresh browser login after the
+it to the `ledgerx_owner_id` access-token claim, and ensure the web client emits the subject,
+`ledgerx-api` audience, and `ledgerx-operator` realm role. The operator risk audit requires a
+subject claim. Test a fresh browser login after the
 change; updating an attribute does not rewrite an already-issued token.
 
 For operator users, assign the `ledgerx-operator` realm role in Keycloak. Spring Security checks

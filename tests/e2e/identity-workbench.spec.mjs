@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
 
@@ -12,8 +13,18 @@ const root = resolve(import.meta.dirname, '../..');
 const docker = process.platform === 'win32' ? 'docker.exe' : 'docker';
 const live = process.env.E2E_LIVE === '1';
 const receiverId = process.env.E2E_MERCHANT_RECEIVER_ID;
+const capturePortfolio = process.env.E2E_CAPTURE_PORTFOLIO === '1' && !live;
 let liveEndpoint;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function capture(page, name) {
+  if (!capturePortfolio) return;
+  const dismiss = page.locator('[data-action="dismiss-notice"]');
+  if (await dismiss.count()) await dismiss.click();
+  const imageDirectory = resolve(root, 'docs/images');
+  await mkdir(imageDirectory, { recursive: true });
+  await page.screenshot({ path: resolve(imageDirectory, `${name}.png`), animations: 'disabled' });
+}
 
 if (live && (process.env.E2E_LIVE_ACK !== 'I_ACCEPT_TEST_DATA_IN_PRODUCTION' ||
     !webOrigin?.startsWith('https://') || !idpOrigin?.startsWith('https://') ||
@@ -119,10 +130,14 @@ async function createUser(request, headers, label, ownerId, operator = false) {
 }
 
 async function signIn(browser, user, section) {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    viewport: capturePortfolio ? { width: 1440, height: 900 } : undefined,
+  });
   const page = await context.newPage();
   await page.goto(webOrigin);
   await expect(page.getByRole('heading', { name: 'Open your workbench' })).toBeVisible();
+  if (section === 'Operations') await capture(page, 'sign-in');
   const authorizeRequest = page.waitForRequest(req => req.url().includes('/protocol/openid-connect/auth?'));
   await page.getByRole('button', { name: 'Sign in' }).click();
   const authorize = new URL((await authorizeRequest).url());
@@ -137,6 +152,8 @@ async function signIn(browser, user, section) {
   await expect(page.getByRole('navigation', { name: 'Workbench sections' }).getByRole('link', { name: section })).toBeVisible();
   const token = await page.evaluate(async () => (await import('/ui/auth.js')).accessToken());
   expect(token).toBeTruthy();
+  const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+  expect(claims.sub).toMatch(uuid);
   return { context, page, token };
 }
 
@@ -279,6 +296,10 @@ test('real Keycloak PKCE identities complete owner, operator, payment and refund
       const result = await response.json();
       expect(result.paymentId).toMatch(uuid);
       await expect(session.page.locator('#main-content')).toContainText(result.paymentId);
+      await capture(session.page, 'merchant-payment');
+      await session.page.evaluate(id => { location.hash = `#/wallets/${id}`; }, operator.person.wallets[0].walletId);
+      await expect(session.page.locator('#main-content tbody tr')).toHaveCount(1);
+      await capture(session.page, 'wallet-and-activity');
       if (brokerOutage) {
         await expect.poll(() => Number(sql("SELECT COUNT(*) FROM ledgerx.outbox_events WHERE status = 'PENDING';")), {
           timeout: 20_000,
@@ -330,6 +351,7 @@ test('real Keycloak PKCE identities complete owner, operator, payment and refund
     const result = await response.json();
     expect(result.refundId).toMatch(uuid);
     await expect(session.page.locator('#main-content')).toContainText(result.refundId);
+    await capture(session.page, 'partial-refund');
     await session.context.close();
     return result;
   });
@@ -346,6 +368,53 @@ test('real Keycloak PKCE identities complete owner, operator, payment and refund
       ), { timeout: 90_000 }).toBe('PUBLISHED');
     }
   });
+
+  if (capturePortfolio) {
+    await test.step('Capture an operator risk review with synthetic data', async () => {
+      const session = await signIn(browser, operatorUser, 'Operations');
+      const headers = { Authorization: `Bearer ${session.token}` };
+      const currentPolicyResponse = await request.get(`${webOrigin}/api/v1/operations/risk/policy`, { headers });
+      expect(currentPolicyResponse.status()).toBe(200);
+      const currentPolicy = await currentPolicyResponse.json();
+      const policyResponse = await request.post(`${webOrigin}/api/v1/operations/risk/policies`, {
+        headers: { ...headers, 'Idempotency-Key': `portfolio-risk-${randomUUID()}` },
+        data: {
+          enabled: true,
+          maxPaymentAmount: '100.00',
+          reviewPaymentCount: 1,
+          reviewPaymentTotal: '100.00',
+          reason: 'Synthetic portfolio review case',
+          expectedVersion: currentPolicy.versionNumber,
+        },
+      });
+      expect(policyResponse.status()).toBe(200);
+      const reviewResponse = await request.post(`${webOrigin}/api/v1/payments`, {
+        headers: {
+          Authorization: `Bearer ${payerToken}`,
+          'Idempotency-Key': `portfolio-reviewed-payment-${randomUUID()}`,
+        },
+        data: {
+          payerWalletId: operator.person.wallets[0].walletId,
+          merchantWalletId: operator.merchant.wallets[0].walletId,
+          money: { amount: '1.00', currency: 'USD' },
+        },
+      });
+      expect(reviewResponse.status()).toBe(202);
+      const review = await reviewResponse.json();
+      expect(review).toMatchObject({ outcome: 'REVIEW', caseStatus: 'OPEN' });
+      expect(review.caseId).toMatch(uuid);
+      await session.context.close();
+      const reviewSession = await signIn(browser, operatorUser, 'Operations');
+      await reviewSession.page.evaluate(() => { location.hash = '#/operations'; });
+      await expect(reviewSession.page.locator('#main-content')).toContainText('Recent risk cases');
+      await expect(reviewSession.page.locator('#main-content')).toContainText(review.caseId.slice(0, 8));
+      await capture(reviewSession.page, 'operator-workbench');
+      await reviewSession.page.evaluate(id => { location.hash = `#/operations/risk/${id}`; }, review.caseId);
+      await expect(reviewSession.page.locator('#main-content')).toContainText(review.caseId);
+      await capture(reviewSession.page, 'risk-review');
+      await reviewSession.context.close();
+    });
+  }
 
   if (webhook) {
     await test.step('External receiver observes retry, terminal failure, replay, and valid signatures', async () => {
