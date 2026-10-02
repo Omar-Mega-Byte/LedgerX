@@ -1,0 +1,14 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The E2E Keycloak URL is a password-free local Compose service address."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = [
+  '''^\s*KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak\s*(#.*)?$'''
+]
+paths = [
+  '''(^|/)compose\.e2e\.yaml$'''
+]
