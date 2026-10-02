@@ -56,6 +56,78 @@ flowchart LR
 
 In production, Spring Security validates the Keycloak issuer and `ledgerx-api` audience. The signed `ledgerx_owner_id` claim scopes owner requests; the `ledgerx-operator` role protects operator routes. `X-LedgerX-Owner-Id` is available only in local/test profiles and is not authentication. See [architecture](docs/architecture.md), [configuration and security](docs/configuration.md), and [deployment](docs/production-deployment.md).
 
+### Inside the modular monolith
+
+These are code and responsibility boundaries inside one Spring Boot process. They are not separately deployed services.
+
+```mermaid
+flowchart TB
+  IDP[Keycloak: signed JWT] --> SEC[Spring Security and caller context]
+  SEC --> OWN[Owner REST controllers]
+  SEC --> OPS[Operator REST controllers]
+
+  subgraph APP[LedgerX Spring Boot application]
+    OWN --> UC[Application use cases]
+    OPS --> UC
+    UC --> TRANSFER[Transfers]
+    UC --> PAY[Payments and refunds]
+    UC --> RISK[Payment risk]
+    UC --> WEB[Webhook administration]
+    UC --> RECON[Reconciliation and operations]
+    TRANSFER --> LEDGER[Shared ledger posting]
+    PAY --> LEDGER
+    PAY --> OUTBOX[Payment and refund outbox]
+    TRANSFER --> STORE[Repositories and persistence]
+    PAY --> STORE
+    RISK --> STORE
+    WEB --> STORE
+    RECON --> STORE
+    LEDGER --> STORE
+    OUTBOX --> STORE
+  end
+
+  STORE --> DB[(PostgreSQL: financial state, journals, idempotency, and evidence)]
+```
+
+### Payment command and financial boundary
+
+An allowed payment commits its domain state, balanced journal, idempotency result, and outbox event in one PostgreSQL transaction. Risk review or block outcomes record a decision without posting money. Risk policies are disabled by default.
+
+```mermaid
+flowchart LR
+  CLIENT[Owner request<br/>JWT + Idempotency-Key] --> AUTH[Validate identity and owner scope]
+  AUTH --> CLAIM[Claim key and fingerprint<br/>inside payment transaction]
+  CLAIM --> EXISTING{Key already used?}
+  EXISTING -->|Same payload, completed| REPLAY[Replay durable payment result]
+  EXISTING -->|Different payload| CONFLICT[Return key-reuse conflict]
+  EXISTING -->|New command| RISK[Evaluate risk policy]
+  RISK --> DECISION{Decision}
+  DECISION -->|Allowed| POST[Lock wallet rows<br/>post balanced journal]
+  POST --> COMMIT[Commit payment, assessment,<br/>idempotency result, and outbox event]
+  DECISION -->|Review or blocked| NO_MONEY[Persist decision only<br/>no payment, journal, or event]
+```
+
+### Event delivery and reconciliation
+
+Kafka carries committed payment and refund facts after the database transaction. Consumers keep durable receipts; webhook delivery is queued and retried separately, so a remote endpoint failure cannot change a financial result.
+
+```mermaid
+flowchart LR
+  DB[(Committed PostgreSQL outbox)] --> PUB[Leased outbox publisher<br/>bounded retry]
+  PUB --> KAFKA[(Kafka payment events)]
+  KAFKA --> AUDIT[Idempotent audit consumer]
+  KAFKA --> ENQUEUE[Idempotent webhook consumer]
+  AUDIT --> RECEIPT[(Consumer receipts)]
+  ENQUEUE --> QUEUE[(Webhook delivery queue)]
+  QUEUE --> DISPATCH[Leased dispatcher<br/>HMAC signature and retry]
+  DISPATCH --> MERCHANT[Merchant endpoint]
+  DISPATCH -. failed attempt evidence .-> QUEUE
+  DB --> RECON[Reconciliation checks]
+  RECEIPT --> RECON
+  QUEUE --> RECON
+  RECON --> FINDINGS[(Audited findings)]
+```
+
 ## API surface
 
 The API is rooted at `/api/v1`. Financial commands use an `Idempotency-Key`; a matching retry returns the durable result, while reusing a key for a different request conflicts.
