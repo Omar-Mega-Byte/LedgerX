@@ -148,4 +148,4 @@ The cumulative refunded amount cannot exceed the payment amount. Use `GET /api/v
 
 ## OpenAPI and workbench
 
-Start the local Compose stack, then open `/swagger-ui/index.html` for interactive schemas and editable examples or `/api-docs` for the OpenAPI JSON. [The API reference screenshot](images/api-reference.png) shows the local UI. For real Keycloak authentication, the same-origin workbench at `/` performs PKCE sign-in; the [deployment guide](production-deployment.md) explains client and owner-claim setup. Production intentionally disables Swagger and OpenAPI routes.
+Start the local Compose stack, then open `/swagger-ui/index.html` for interactive schemas and editable examples or `/api-docs` for the OpenAPI JSON. The [Swagger gallery](images/api/swagger-overview.png) in the repository README shows representative request and response contracts across the implemented route groups. For real Keycloak authentication, the same-origin workbench at `/` performs PKCE sign-in; the [deployment guide](production-deployment.md) explains client and owner-claim setup. Production intentionally disables Swagger and OpenAPI routes.
