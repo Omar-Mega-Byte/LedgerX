@@ -221,4 +221,6 @@ scripts/        Deployment, backup, restore, and maintenance tools
 
 **CV summary:** Built a Java 21/Spring Boot USD ledger with immutable double-entry posting, idempotent transfers and merchant payments, PostgreSQL refund invariants, Kafka outbox delivery, Keycloak owner/operator authorization, signed webhooks, and containerized deployment backed by integration and browser verification.
 
-No license has been selected yet.
+## License
+
+LedgerX is licensed under the [MIT License](LICENSE). See the license file for the full terms.
