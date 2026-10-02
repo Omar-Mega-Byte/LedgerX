@@ -98,7 +98,7 @@ balanced SQL journal supplies the initial test-only balance because production h
 funding action. The runner removes only its uniquely named Compose project and data when done.
 CI installs Chromium and its Linux dependencies before running this suite.
 
-To regenerate the portfolio workbench screenshots from synthetic E2E data, set `E2E_CAPTURE_PORTFOLIO=1` before running `npm run test:e2e`. The opt-in test writes six images to `docs/images/`, including an operator review case; the test stack and data are removed afterward. The API reference screenshot can be recaptured from local `/swagger-ui/index.html` after changing OpenAPI text.
+The README's API gallery captures the local Swagger UI's documented request and response contracts. These examples use generated OpenAPI placeholders and do not execute financial requests. Capture them only from the isolated local profile after changing the API reference; production disables `/swagger-ui/index.html` and `/api-docs`.
 
 This suite does not verify a public certificate, external merchant webhook delivery, or a live
 deployment's Keycloak configuration. Continue those checks during deployment acceptance.
