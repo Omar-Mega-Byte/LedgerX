@@ -210,4 +210,3 @@ durable alerting, unattended backups, and the listed recovery exercises remain o
 | `verify-application-restore.ps1 -BackupDirectory <local-generation> -EnvFile .env` | Restored application healthy; new reconciliation `COMPLETED:0` |
 | `node node_modules/@playwright/test/cli.js test --config playwright.config.mjs tests/e2e/identity-workbench.spec.mjs` with guarded live environment | Two scenarios passed, including real expiry rejection after clock skew |
 | `.\scripts\reconcile-production-realm.ps1 -EnvFile .env` | Passed initial reconciliation, idempotent repeat, and post-restart check |
-| `.\scripts\update-graphify.ps1` | Code graph rebuilt |

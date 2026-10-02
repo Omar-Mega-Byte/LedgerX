@@ -20,4 +20,3 @@
 # Improve GitHub language classification for generated and configuration files.
 *.java linguist-language=Java
 pom.xml linguist-language=XML
-graphify-out/graph.json merge=graphify
