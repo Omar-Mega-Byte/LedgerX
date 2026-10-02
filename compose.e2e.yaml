@@ -55,7 +55,7 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${E2E_KEYCLOAK_ADMIN_USERNAME:?set by the test runner}
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak # gitleaks:allow - test-only service URL without embedded credentials
       KC_DB_USERNAME: ${E2E_KEYCLOAK_DB_USERNAME:?set by the test runner}
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
